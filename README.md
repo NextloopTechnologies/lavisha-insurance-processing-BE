@@ -1,4 +1,4 @@
-# lavisha-insurance-processing-BE
+# Lavisha-Insurance-Processing-Backend
 
 
 
@@ -30,9 +30,10 @@ docker run --name larisha-pg \
 
 ### Start the project
 
-```npm install
-   npm run build
-   npm run start
+```
+  npm install
+  npm run build
+  npm run start
 ```
 
 ### Check Local DB with GUI using Prisma Studio
