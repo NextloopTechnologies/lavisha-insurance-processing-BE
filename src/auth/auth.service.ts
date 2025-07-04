@@ -1,46 +1,60 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcrypt';
-import { Prisma, User } from '@prisma/client';
+import { $Enums, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { AuthResponse } from './dto/auth-response.dto';
 
 @Injectable()
 export class AuthService {
     constructor(
-        private usersService: UsersService,
         private prisma: PrismaService,
         private jwtService: JwtService
     ) {}
 
     async validateUser(email: string, pass: string) {
-        const user = await this.usersService.user({ email });
+        const user =  await this.prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+        });
         if (!user) throw new UnauthorizedException('Invalid credentials');
 
         const passwordValid = await bcrypt.compare(pass, user.password);
         if (!passwordValid) throw new UnauthorizedException('Invalid credentials');
 
-        const { password, ...result } = user;
-        return result;
+        return { id: user.id, name: user.name, email: user.email , role: user.role };
     }
 
-    async login(email: string, password: string): Promise<{ user: Omit<User, 'password'>, access_token: string }> {
-        const user = await this.validateUser(email, password);
-        const payload = { sub: user.id, email: user.email }
-        return {
-            user,
-            access_token: await this.jwtService.signAsync(payload)
-        }
-    }
-
-    async register(data: Prisma.UserCreateInput) {
-         const existingUser = await this.prisma.user.findUnique({
-            where: { email: data.email.toLowerCase() },
+    async generateAndStoreToken(user: { id: string, name: string, email: string, role: $Enums.Role}) {
+        const payload = { sub: user.id, email: user.email, role: user.role }
+        const token = await this.jwtService.signAsync(payload)
+        if(!token) throw new UnauthorizedException('Failed to generate token!');
+    
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                tokens: {
+                    push: token,
+                },
+            },
         });
 
-        if (existingUser) {
-            throw new BadRequestException('Email already in use');
+        return {
+            user,
+            access_token: token
         }
+    }
+
+    async login(email: string, password: string): Promise<AuthResponse> {
+        const user = await this.validateUser(email, password);
+        return await this.generateAndStoreToken(user);
+    }
+
+    async register(data: Prisma.UserCreateInput): Promise<AuthResponse> {
+        const existingUser = await this.prisma.user.findUnique({
+            where: { email: data.email.toLowerCase() },
+        });
+        if (existingUser) throw new BadRequestException('Email already in use');
+        
         const hashedPassword = await bcrypt.hash(data.password, 10);
         const user = await this.prisma.user.create({
             data: {
@@ -48,9 +62,13 @@ export class AuthService {
                 email: data.email.toLowerCase(),
                 password: hashedPassword,
             },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+            }
         });
-
-        const { password, ...rest } = user;
-        return rest;
+        return await this.generateAndStoreToken(user);        
     }
 }

@@ -26,6 +26,7 @@ model User {
   password String 
   name String 
   role Role 
+  tokens String[] @default([])
   hospitalId String? 
   hospital Hospital? @relation(fields: [hospitalId], references: [id]) 
   createdAt DateTime @default(now()) 
