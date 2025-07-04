@@ -12,4 +12,161 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // directUrl = env("DIRECT_URL") // Optional, for migrations
 }
+// Define your database models here
+
+enum Role {
+  SUPER_ADMIN
+  HOSPITAL
+}
+
+model User { 
+  id String @id @default(uuid()) 
+  email String @unique 
+  password String 
+  name String 
+  role Role 
+  hospitalId String? 
+  hospital Hospital? @relation(fields: [hospitalId], references: [id]) 
+  createdAt DateTime @default(now()) 
+  updatedAt DateTime @updatedAt 
+} 
+
+model Hospital {
+  id            String   @id @default(uuid())
+  name          String
+  address       String
+  phone         String
+  email         String   @unique
+  users         User[]
+  patients      Patient[]
+  createdAt     DateTime @default(now())
+}
+
+model Patient {
+  id            String   @id @default(uuid())
+  name          String
+  uhid          String   @unique
+  age           Int
+  admissionDate DateTime
+  tpaName       String
+  hospitalId    String
+  hospital      Hospital @relation(fields: [hospitalId], references: [id])
+  insuranceRequests InsuranceRequest[]
+  documents     Document[]
+  createdAt     DateTime @default(now())
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  url         String
+  fileName    String
+  type        DocumentType
+  version     Int?     // for estimates
+  uploadedBy  String
+  patientId   String
+  insuranceRequestId String?
+  uploadedAt  DateTime @default(now())
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
+}
+
+enum DocumentType {
+  ESTIMATE
+  DIAGNOSTIC
+  SUMMARY
+  FINAL_BILL
+  ENHANCEMENT_ESTIMATE
+  DISCHARGE_SUMMARY
+  SETTLEMENT_LETTER
+  OTHER
+}
+
+model InsuranceRequest {
+  id          String   @id @default(uuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  status      ClaimStatus @default(SUBMITTED)
+  enhancements Enhancement[]
+  dischargeAt DateTime?
+  comments    Comment[]
+  documents   Document[]
+  discharge   Discharge?
+  settlement  Settlement?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum ClaimStatus {
+  SUBMITTED
+  QUERIED
+  APPROVED
+  DENIED
+  DISCHARGED
+  SETTLED
+}
+
+model Enhancement {
+  id                 String   @id @default(uuid())
+  insuranceRequestId String
+  insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+  revisedEstimateUrl String
+  interimBillUrl     String?
+  raisedAt           DateTime @default(now())
+  respondedAt        DateTime?
+  status             EnhancementStatus @default(PENDING)
+  notes              String?
+}
+
+enum EnhancementStatus {
+  PENDING
+  SENT_TO_TPA
+  APPROVED
+  DENIED
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  text        String
+  type        CommentType
+  insuranceRequestId String
+  insuranceRequest InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+  fileUrl     String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+}
+
+enum CommentType {
+  NOTE
+  QUERY
+  TPA_REPLY
+}
+
+model Discharge {
+  id                  String   @id @default(uuid())
+  insuranceRequestId  String   @unique
+  finalBillUrl        String
+  dischargeSummaryUrl String
+  uploadedAt          DateTime @default(now())
+  insuranceRequest    InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+}
+
+model Settlement {
+  id                  String   @id @default(uuid())
+  insuranceRequestId  String   @unique
+  letterUrl           String
+  refNumber           String
+  settledDate         DateTime
+  insuranceRequest    InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String
+  action      String
+  targetType  String
+  targetId    String
+  timestamp   DateTime @default(now())
+}
+
