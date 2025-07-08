@@ -17,6 +17,7 @@ datasource db {
 
 enum Role {
   SUPER_ADMIN
+  ADMIN
   HOSPITAL
 }
 
@@ -26,35 +27,21 @@ model User {
   password String 
   name String 
   role Role 
-  hospitalId String? 
-  hospital Hospital? @relation(fields: [hospitalId], references: [id]) 
+  tokens String[] @default([])
+  hospitalName String?
   createdAt DateTime @default(now()) 
   updatedAt DateTime @updatedAt 
+  documents Document[]
+  comments Comment[]
+  notifications Notification[]
 } 
-
-model Hospital {
-  id            String   @id @default(uuid())
-  name          String
-  address       String
-  phone         String
-  email         String   @unique
-  users         User[]
-  patients      Patient[]
-  createdAt     DateTime @default(now())
-}
 
 model Patient {
   id            String   @id @default(uuid())
   name          String
-  uhid          String   @unique
   age           Int
-  admissionDate DateTime
-  tpaName       String
-  hospitalId    String
-  hospital      Hospital @relation(fields: [hospitalId], references: [id])
-  insuranceRequests InsuranceRequest[]
-  documents     Document[]
   createdAt     DateTime @default(now())
+  insuranceRequests InsuranceRequest[]
 }
 
 model Document {
@@ -62,46 +49,53 @@ model Document {
   url         String
   fileName    String
   type        DocumentType
-  version     Int?     // for estimates
+  remark      String?
   uploadedBy  String
-  patientId   String
-  insuranceRequestId String?
+  insuranceRequestId String
   uploadedAt  DateTime @default(now())
-  patient     Patient  @relation(fields: [patientId], references: [id])
+  uploader    User    @relation(fields: [uploadedBy], references: [id])
   insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
 }
 
 enum DocumentType {
-  ESTIMATE
+  ICP
+  CLINIC_PAPER
+  PAST_INVESTIGATION
+  CURRENT_INVESTIGATION
   DIAGNOSTIC
-  SUMMARY
-  FINAL_BILL
   ENHANCEMENT_ESTIMATE
   DISCHARGE_SUMMARY
   SETTLEMENT_LETTER
+  EXCEL_REPORT
   OTHER
 }
 
 model InsuranceRequest {
   id          String   @id @default(uuid())
+  refNumber   String   @unique 
   patientId   String
-  patient     Patient  @relation(fields: [patientId], references: [id])
-  status      ClaimStatus @default(SUBMITTED)
-  enhancements Enhancement[]
-  dischargeAt DateTime?
-  comments    Comment[]
-  documents   Document[]
-  discharge   Discharge?
-  settlement  Settlement?
+  description String?
+  doctorName  String
+  tpaName     String
+  assignedTo  String?
+  status      ClaimStatus @default(PENDING)
+  additionalNotes String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  enhancements Enhancement[]
+  comments    Comment[]
+  documents   Document[]
+  patient     Patient  @relation(fields: [patientId], references: [id])
 }
 
 enum ClaimStatus {
-  SUBMITTED
+  PENDING
+  SENT_TO_TPA
+  DRAFT
   QUERIED
   APPROVED
   DENIED
+  ENHANCEMENT
   DISCHARGED
   SETTLED
 }
@@ -109,20 +103,11 @@ enum ClaimStatus {
 model Enhancement {
   id                 String   @id @default(uuid())
   insuranceRequestId String
-  insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
-  revisedEstimateUrl String
-  interimBillUrl     String?
   raisedAt           DateTime @default(now())
   respondedAt        DateTime?
-  status             EnhancementStatus @default(PENDING)
+  status             ClaimStatus @default(PENDING)
   notes              String?
-}
-
-enum EnhancementStatus {
-  PENDING
-  SENT_TO_TPA
-  APPROVED
-  DENIED
+  insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
 }
 
 model Comment {
@@ -130,35 +115,29 @@ model Comment {
   text        String
   type        CommentType
   insuranceRequestId String
-  insuranceRequest InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
   fileUrl     String?
   createdBy   String
   createdAt   DateTime @default(now())
+  creator    User    @relation(fields: [createdBy], references: [id])
+  insuranceRequest InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
 }
 
 enum CommentType {
   NOTE
   QUERY
   TPA_REPLY
+  SYSTEM
 }
 
-model Discharge {
-  id                  String   @id @default(uuid())
-  insuranceRequestId  String   @unique
-  finalBillUrl        String
-  dischargeSummaryUrl String
-  uploadedAt          DateTime @default(now())
-  insuranceRequest    InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String
+  message    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
 }
 
-model Settlement {
-  id                  String   @id @default(uuid())
-  insuranceRequestId  String   @unique
-  letterUrl           String
-  refNumber           String
-  settledDate         DateTime
-  insuranceRequest    InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
-}
 
 model ActivityLog {
   id          String   @id @default(uuid())
