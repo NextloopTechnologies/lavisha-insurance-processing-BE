@@ -41,4 +41,19 @@ docker run --name larisha-pg \
 - From the project directory `cd prisma`.
 - Cross check if `schema.prisma` is present. 
 - Execute `npx prisma studio` 
+
+### 🛡️ Git Hook to Prevent Unwanted Migrations
+
+To prevent migration files from being committed on non-staging branches, a Husky `pre-commit` hook is set up:
+
+- Allowed: Commit `prisma/migrations/` only on `staging` branch.
+- Blocked: On any other branch, you'll get a warning and the commit will be aborted.
+
+This keeps schema history clean and ensures only approved branches have migrations.
+
+💡 On feature branches, use:
+
+```bash
+npx prisma db push --force-reset
+
  
