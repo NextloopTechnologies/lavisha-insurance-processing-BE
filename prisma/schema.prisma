@@ -29,33 +29,31 @@ model User {
   role Role 
   tokens String[] @default([])
   hospitalName String?
-  documents Document[]
-  comment Comment[]
   createdAt DateTime @default(now()) 
   updatedAt DateTime @updatedAt 
+  documents Document[]
+  comments Comment[]
+  notifications Notification[]
 } 
 
 model Patient {
   id            String   @id @default(uuid())
   name          String
   age           Int
-  insuranceRequests InsuranceRequest[]
-  documents     Document[]
   createdAt     DateTime @default(now())
+  insuranceRequests InsuranceRequest[]
 }
 
 model Document {
   id          String   @id @default(uuid())
   url         String
   fileName    String
-  type        String
-  version     Int?     
+  type        DocumentType
+  remark      String?
   uploadedBy  String
-  patientId   String
   insuranceRequestId String
   uploadedAt  DateTime @default(now())
   uploader    User    @relation(fields: [uploadedBy], references: [id])
-  patient     Patient  @relation(fields: [patientId], references: [id])
   insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
 }
 
@@ -64,10 +62,7 @@ enum DocumentType {
   CLINIC_PAPER
   PAST_INVESTIGATION
   CURRENT_INVESTIGATION
-  ESTIMATE
   DIAGNOSTIC
-  SUMMARY
-  FINAL_BILL
   ENHANCEMENT_ESTIMATE
   DISCHARGE_SUMMARY
   SETTLEMENT_LETTER
@@ -77,26 +72,30 @@ enum DocumentType {
 
 model InsuranceRequest {
   id          String   @id @default(uuid())
+  refNumber   String   @unique 
   patientId   String
   description String?
   doctorName  String
   tpaName     String
   assignedTo  String?
-  status      ClaimStatus @default(SUBMITTED)
-  enhancements Enhancement[]
-  comments    Comment[]
-  documents   Document[]
+  status      ClaimStatus @default(PENDING)
   additionalNotes String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  enhancements Enhancement[]
+  comments    Comment[]
+  documents   Document[]
   patient     Patient  @relation(fields: [patientId], references: [id])
 }
 
 enum ClaimStatus {
-  SUBMITTED
+  PENDING
+  SENT_TO_TPA
+  DRAFT
   QUERIED
   APPROVED
   DENIED
+  ENHANCEMENT
   DISCHARGED
   SETTLED
 }
@@ -106,16 +105,9 @@ model Enhancement {
   insuranceRequestId String
   raisedAt           DateTime @default(now())
   respondedAt        DateTime?
-  status             EnhancementStatus @default(PENDING)
+  status             ClaimStatus @default(PENDING)
   notes              String?
   insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
-}
-
-enum EnhancementStatus {
-  PENDING
-  SENT_TO_TPA
-  APPROVED
-  DENIED
 }
 
 model Comment {
@@ -134,8 +126,18 @@ enum CommentType {
   NOTE
   QUERY
   TPA_REPLY
-  DOCUMENT_UPLOAD
+  SYSTEM
 }
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String
+  message    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
 
 model ActivityLog {
   id          String   @id @default(uuid())
