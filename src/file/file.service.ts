@@ -2,14 +2,18 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from 'src/common/constants/file.constants';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
-import { DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, DeleteObjectCommandOutput, DeleteObjectsCommand, DeleteObjectsCommandOutput, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from 'src/common/utils/s3.util';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3FileUploadResult } from 'src/common/interfaces/s3.interface';
 
 @Injectable()
 export class FileService {
 
-    async uploadFile(file: Express.Multer.File, folder: string) {
+    async uploadFile(
+        file: Express.Multer.File, 
+        folder: string
+    ): Promise<S3FileUploadResult> {
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
             throw new BadRequestException('Invalid file type');
         }
@@ -40,11 +44,17 @@ export class FileService {
         };
     }
 
-    async uploadMultipleFiles(files: Express.Multer.File[], folder: string) {
+    async uploadMultipleFiles(
+        files: Express.Multer.File[], 
+        folder: string
+    ): Promise<S3FileUploadResult[]>  {
         return Promise.all(files.map(file => this.uploadFile(file, folder)));
     }
     
-    async getPresignedUrl(key: string, expiresInSeconds = 900) {
+    async getPresignedUrl(
+        key: string, 
+        expiresInSeconds = 900
+    ): Promise<string> {
         const command = new GetObjectCommand({
             Bucket: process.env.AWS_BUCKET_NAME,
             Key: key,
@@ -53,14 +63,18 @@ export class FileService {
         return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
     }
 
-    async deleteFile(key: string) {
+    async deleteFile(
+        key: string
+    ): Promise<DeleteObjectCommandOutput> {
         return s3.send(new DeleteObjectCommand({
             Bucket: process.env.AWS_BUCKET_NAME,
             Key: key,
         }));
     }
 
-    async deleteMultipleFiles(keys: string[]) {
+    async deleteMultipleFiles(
+        keys: string[]
+    ): Promise<DeleteObjectsCommandOutput> {
         const objects = keys.map(k => ({ Key: k }));
         return s3.send(new DeleteObjectsCommand({
             Bucket: process.env.AWS_BUCKET_NAME,
