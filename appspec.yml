@@ -1,0 +1,9 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /home/ec2-user/workspace/lavisha-dev
+hooks:
+  AfterInstall:
+    - location: scripts/start.sh
+      runas: ec2-user
