@@ -14,7 +14,7 @@ import { FileModule } from './file/file.module';
     AuthModule, 
     UsersModule,
     PrismaModule, 
-    PatientsModule
+    PatientsModule,
     FileModule
   ],
   controllers: [AppController],
