@@ -6,3 +6,5 @@ source "$NVM_DIR/nvm.sh"
 cd /home/ec2-user/workspace/lavisha-dev
 
 npm install
+npm run db:setup
+npm run db:seed

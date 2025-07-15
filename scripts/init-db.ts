@@ -35,14 +35,8 @@ async function waitForDatabase(): Promise<void> {
 
 async function runMigrations(): Promise<void> {
   try {
-    console.log('🧩 Running Prisma migrations...');
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction) {
-      execSync('npx prisma migrate deploy', { stdio: 'inherit' });
-    } else {
-      execSync('npx prisma migrate dev --name auto', { stdio: 'inherit' });
-    }
-    
+    console.log('🧩 Applying Prisma migrations...');
+    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
     console.log('✅ Migrations applied successfully.');
   } catch (err) {
     console.error('❌ Failed to run Prisma migrations:', err);

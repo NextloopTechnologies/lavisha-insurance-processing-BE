@@ -16,6 +16,13 @@ async function main() {
         throw new Error('Missing required environment variables for seeding.');
     }
 
+    const dataExists = await prisma.user.findMany({ select: { id: true }});
+
+    if(dataExists.length > 0) {
+        console.log('⚠️ Data already exists. Skipping seeding.');
+        return;
+    }
+    
     const superAdmin = await prisma.user.upsert({
         where: { email: SUPER_ADMIN_EMAIL },
         update: {},
