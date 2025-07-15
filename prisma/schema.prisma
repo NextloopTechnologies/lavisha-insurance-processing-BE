@@ -18,6 +18,7 @@ datasource db {
 enum Role {
   SUPER_ADMIN
   ADMIN
+  HOSPITAL_MANAGER
   HOSPITAL
 }
 
@@ -40,6 +41,8 @@ model Patient {
   id            String   @id @default(uuid())
   name          String
   age           Int
+  url           String?
+  fileName      String?
   createdAt     DateTime @default(now())
   insuranceRequests InsuranceRequest[]
 }
@@ -76,6 +79,7 @@ model InsuranceRequest {
   patientId   String
   description String?
   doctorName  String
+  insuranceCompany String
   tpaName     String
   assignedTo  String?
   status      ClaimStatus @default(PENDING)
@@ -127,6 +131,7 @@ enum CommentType {
   QUERY
   TPA_REPLY
   SYSTEM
+  HOSPITAL_NOTE
 }
 
 model Notification {
