@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -15,32 +15,46 @@ export class InsuranceRequestsService {
       select: { refNumber: true },
       where: { refNumber: { startsWith: 'CLM-' } },
     });
-    console.log("Last claim", lastClaim)
     const lastNumber = lastClaim?.refNumber?.split('-')[1];
     const next = lastNumber ? parseInt(lastNumber) + 1 : 1;
-
     return `CLM-${String(next).padStart(5, '0')}`;
   }
 
-  async create(data: CreateInsuranceRequestDto) {
-    const refNumber = await this.generateClaimRefNumber()
-    return await this.prisma.insuranceRequest.create({ data : { ...data, refNumber } });
+  async create(data: CreateInsuranceRequestDto): Promise<InsuranceRequest> {
+    const { patientId, ...rest } = data;
+    const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
+    if (!patient) throw new BadRequestException('Invalid patient ID');
+
+    const refNumber = await this.generateClaimRefNumber();
+    return await this.prisma.insuranceRequest.create({ 
+      data : { 
+        ...rest, 
+        patient: { connect: { id: patientId }}, 
+        refNumber 
+      }
+    });
   }
 
-  // async findAll(params: {
-  //     skip?: number;
-  //     take?: number;
-  //     where?: Prisma.PatientWhereInput;
-  //     orderBy?: Prisma.PatientOrderByWithRelationInput;
-  //   }): Promise<InsuranceRequest[]> {
-  //     const { skip, take, where, orderBy } = params;
-  //     return await this.prisma.insuranceRequest.findMany({
-  //       skip,
-  //       take,
-  //       where,
-  //       orderBy,
-  //     });
-  //   }
+  async findAll(params: {
+      skip?: number;
+      take?: number;
+      where?: Prisma.InsuranceRequestWhereInput;
+      orderBy?: Prisma.InsuranceRequestOrderByWithRelationInput;
+    }): Promise<InsuranceRequest[]> {
+      const { skip, take, where, orderBy } = params;
+      return await this.prisma.insuranceRequest.findMany({
+        skip,
+        take,
+        where,
+        orderBy,
+        include: {
+          patient: { select: { id: true, name: true }},
+          documents: true,
+          enhancements: true,
+          comments: true
+        }
+      });
+    }
   
     async findOne(
       insuranceRequestWhereUniqueInput: Prisma.InsuranceRequestWhereUniqueInput
@@ -56,20 +70,28 @@ export class InsuranceRequestsService {
       });
     }
     
-    // async update(params: {
-    //   where: Prisma.PatientWhereUniqueInput,
-    //   data: Prisma.PatientUpdateInput
-    // }): Promise<InsuranceRequest> {
-    //   const { where, data } = params;
-    //   return await this.prisma.insuranceRequest.update({ 
-    //       data, 
-    //       where
-    //   })
-    // }
+    async update(params: {
+      where: Prisma.InsuranceRequestWhereUniqueInput,
+      data: UpdateInsuranceRequestDto
+    }): Promise<InsuranceRequest> {
   
-    async remove(id: string): Promise<InsuranceRequest>{
+      const { where, data } = params;
+      const { patientId, ...rest } = data;
+      const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
+      if (!patient) throw new BadRequestException('Invalid patient ID');
+
+      return await this.prisma.insuranceRequest.update({
+        where,
+        data: {
+          ...rest,
+          patient: { connect: { id: patientId }}
+        },
+      });
+    }
+  
+    async remove(refNumber: string): Promise<InsuranceRequest>{
       return await this.prisma.insuranceRequest.delete({
-        where: { id }
+        where: { refNumber }
       })
     }
 }
