@@ -4,6 +4,10 @@ const prisma = new PrismaClient();
 
 async function main() {
 
+    if (process.env.SKIP_SEED?.toLowerCase() === 'true') {
+        console.log('⚠️ Prisma seed skipped due to SKIP_SEED=true');
+        process.exit(0);
+    }
     const { 
         SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD,
         ADMIN_EMAIL, ADMIN_PASSWORD,
@@ -64,8 +68,10 @@ async function main() {
 
     const patient = await prisma.patient.create({
         data: {
-        name: 'John Doe',
-        age: 35,
+            name: 'John Doe',
+            age: 35,
+            url: '',
+            fileName: ''
         },
     });
 

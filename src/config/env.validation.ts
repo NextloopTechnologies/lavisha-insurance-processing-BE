@@ -1,6 +1,27 @@
-import { IsBooleanString, IsOptional, IsString } from 'class-validator';
+import { IsBooleanString, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class EnvSchema {
+    @IsString()
+    DB_USER: string;
+
+    @IsString()
+    DB_PASSWORD: string;
+
+    @IsOptional()
+    @IsString()
+    DB_HOST?: string;
+    
+    @IsString()
+    DB_NAME: string;
+
+    @IsOptional()
+    @IsString()
+    DB_PORT?: string;
+
+    @IsOptional()
+    @IsBooleanString()
+    SKIP_SEED?: string;
+
     @IsString()
     DATABASE_URL: string
 

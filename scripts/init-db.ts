@@ -2,12 +2,18 @@
 import { execSync } from 'child_process';
 import { Client } from 'pg';
 
+const { DB_USER, DB_NAME, DB_PASSWORD } = process.env;
+
+if (!DB_USER || !DB_NAME || !DB_PASSWORD) {
+  throw new Error('Missing required environment variables for db config.');
+}
+
 const DB_CONFIG = {
-  user: 'larisha',
-  host: 'localhost',
-  database: 'larisha_db',
-  password: '123456',
-  port: 5432,
+  user: process.env.DB_USER!,
+  host: process.env.DB_HOST!,
+  database: process.env.DB_NAME!,
+  password: process.env.DB_PASSWORD!,
+  port: parseInt(process.env.DB_PORT! || '5432', 10),
 };
 
 async function waitForDatabase(): Promise<void> {
