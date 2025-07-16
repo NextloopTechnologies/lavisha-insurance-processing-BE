@@ -79,6 +79,7 @@ model InsuranceRequest {
   patientId   String
   description String?
   doctorName  String
+  isPreAuth   Boolean @default(false)
   insuranceCompany String
   tpaName     String
   assignedTo  String?
