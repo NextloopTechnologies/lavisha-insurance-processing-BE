@@ -56,4 +56,8 @@ This keeps schema history clean and ensures only approved branches have migratio
 ```bash
 npx prisma db push --force-reset
 
- 
+Run migrations on staging(canonical branch) to keep in sync with all non-staging schema changes;
+
+1- Reset the db with `SKIP_SEED=true npx prisma migrate reset` and make sure to add `SKIP_SEED=true` in env or inline.
+2- Peform migration `npx prisma migrate dev --init usefulname`.
+3- Peform seeding (Optional) `SKIP_SEED=false npx prisma db seed` or from env.
