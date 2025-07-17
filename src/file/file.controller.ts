@@ -1,9 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FileService } from './file.service';
 import { MAX_FILE_SIZE, ALLOWED_MIME_TYPES } from '../common/constants/file.constants';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('file')
+@UseGuards(JwtAuthGuard)
 export class FileController {
     constructor(private readonly fileService: FileService) {}
 

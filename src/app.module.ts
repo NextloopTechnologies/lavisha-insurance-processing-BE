@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PatientsModule } from './patients/patients.module';
 import { FileModule } from './file/file.module';
 import { InsuranceRequestsModule } from './insurance-requests/insurance-requests.module';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { InsuranceRequestsModule } from './insurance-requests/insurance-requests
     PrismaModule, 
     PatientsModule,
     FileModule,
-    InsuranceRequestsModule
+    InsuranceRequestsModule,
+    CommentsModule
   ],
   controllers: [AppController],
   providers: [AppService],

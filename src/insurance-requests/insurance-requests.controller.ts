@@ -1,11 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { InsuranceRequestsService } from './insurance-requests.service';
 import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { InsuranceRequest, Prisma } from '@prisma/client';
 import { FindAllInsuranceRequestDto } from './dto/find-all-insurance-request.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('claims')
+@UseGuards(JwtAuthGuard)
 export class InsuranceRequestsController {
   constructor(private readonly insuranceRequestsService: InsuranceRequestsService) {}
 
