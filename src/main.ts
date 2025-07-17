@@ -6,6 +6,7 @@ import { PrismaExceptionFilter } from 'filters/primsa-exception.filter';
 import { plainToInstance } from 'class-transformer';
 import { EnvSchema } from './config/env.validation';
 import { validateSync } from 'class-validator';
+import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 
 async function bootstrap() {
   
@@ -39,6 +40,27 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const PORT = configService.get<number>('PORT') || 8000;
+
+  const allowedOrigins = configService
+    .get<string>('ALLOWED_ORIGINS', '')
+    .split(',')
+    .map(origin => origin.trim())
+
+  const corsOption: CorsOptions = {
+    origin: (
+      origin: string|undefined, 
+      callback: (err: Error, allow?: boolean) => void
+    ): void => {
+      if(!origin || allowedOrigins.includes(origin)){
+        callback(null, true)
+      } else {
+        callback(new Error(`❌ Origin ${origin} not allowed by CORS`))
+      }
+    }
+  }
+
+  app.enableCors(corsOption)
+
   await app.listen(PORT);
   console.log(`🚀 Application is running on: http://localhost:${PORT}`);
 }

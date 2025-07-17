@@ -28,6 +28,9 @@ export class EnvSchema {
     @IsString()
     JWT_TOKEN: string;
 
+    @IsString()
+    ALLOWED_ORIGINS: string;
+
     @IsBooleanString()
     ENABLE_FILE_UPLOAD: string;
 
