@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PatientsModule } from './patients/patients.module';
 import { FileModule } from './file/file.module';
+import { InsuranceRequestsModule } from './insurance-requests/insurance-requests.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { FileModule } from './file/file.module';
     UsersModule,
     PrismaModule, 
     PatientsModule,
-    FileModule
+    FileModule,
+    InsuranceRequestsModule
   ],
   controllers: [AppController],
   providers: [AppService],
