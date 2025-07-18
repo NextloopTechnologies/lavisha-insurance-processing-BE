@@ -4,7 +4,6 @@ import { CreateCommentsDto } from './dto/create-comments.dto';
 import { Comment, CommentType, Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { FindAllCommentsDto } from './dto/find-all-comments.dto';
-import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 
 @Controller('comments')
 @UseGuards(JwtAuthGuard)
@@ -18,9 +17,9 @@ export class CommentsController {
   }
 
   @Get()
-  findAll(@Query() query: FindAllCommentsDto): Promise<PaginatedResult<Comment>> {
+  findAll(@Query() query: FindAllCommentsDto): Promise<Comment[]> {
     const {
-      skip, take, sortBy, sortOrder,
+      take, cursor, sortBy, sortOrder,
       type, insuranceRequestId, createdBy, role
     } = query;
 
@@ -31,15 +30,15 @@ export class CommentsController {
       HOSPITAL: ['NOTE', 'QUERY', 'TPA_REPLY'],
     };
 
-  const where: Prisma.CommentWhereInput = {
-    ...(type && { type }),
-    ...(insuranceRequestId && { insuranceRequestId }),
-    ...(createdBy && { createdBy }),
-    type: { in: allowedTypes[role] },
-  };
+    const where: Prisma.CommentWhereInput = {
+      ...(type && { type }),
+      ...(insuranceRequestId && { insuranceRequestId }),
+      ...(createdBy && { createdBy }),
+      type: { in: allowedTypes[role] },
+    };
 
-  const orderBy = sortBy ? { [sortBy]: sortOrder } : undefined;
+    const orderBy = sortBy ? { [sortBy]: sortOrder } : undefined;
 
-  return this.commentsService.findAll({ skip, take, where, orderBy });
+    return this.commentsService.findAll({ take, cursor, where, orderBy });
   }
 }

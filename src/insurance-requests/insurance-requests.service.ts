@@ -3,6 +3,7 @@ import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InsuranceRequest, Prisma } from '@prisma/client';
+import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 
 @Injectable()
 export class InsuranceRequestsService {
@@ -40,20 +41,24 @@ export class InsuranceRequestsService {
       take?: number;
       where?: Prisma.InsuranceRequestWhereInput;
       orderBy?: Prisma.InsuranceRequestOrderByWithRelationInput;
-    }): Promise<InsuranceRequest[]> {
+    }): Promise<PaginatedResult<InsuranceRequest>> {
       const { skip, take, where, orderBy } = params;
-      return await this.prisma.insuranceRequest.findMany({
-        skip,
-        take,
-        where,
-        orderBy,
-        include: {
-          patient: { select: { id: true, name: true }},
-          documents: true,
-          enhancements: true,
-          comments: true
-        }
-      });
+      const [total, data] = await this.prisma.$transaction([
+        this.prisma.insuranceRequest.count( { where}),
+        this.prisma.insuranceRequest.findMany({
+          skip,
+          take,
+          where,
+          orderBy,
+          include: {
+            patient: { select: { id: true, name: true }},
+            documents: true,
+            enhancements: true,
+            comments: true
+          }
+        })
+      ])
+      return { total, data } 
     }
   
     async findOne(

@@ -5,6 +5,7 @@ import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { InsuranceRequest, Prisma } from '@prisma/client';
 import { FindAllInsuranceRequestDto } from './dto/find-all-insurance-request.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 
 @Controller('claims')
 @UseGuards(JwtAuthGuard)
@@ -17,7 +18,7 @@ export class InsuranceRequestsController {
   }
 
   @Get()
-    findAll(@Query() query: FindAllInsuranceRequestDto  ) {
+    findAll(@Query() query: FindAllInsuranceRequestDto): Promise<PaginatedResult<InsuranceRequest>> {
       const { skip, take, sortBy, sortOrder, 
         refNumber, doctorName, insuranceCompany, tpaName, assignedTo,
         patientName, status, createdFrom, createdTo
@@ -61,7 +62,7 @@ export class InsuranceRequestsController {
   }
 
   @Delete(':refNumber')
-  remove(@Param('refNumber') refNumber: string) {
+  remove(@Param('refNumber') refNumber: string): Promise<InsuranceRequest> {
     return this.insuranceRequestsService.remove(refNumber);
   }
 }

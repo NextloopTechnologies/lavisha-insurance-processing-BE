@@ -3,8 +3,9 @@ import { PatientsService } from './patients.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
-import { Prisma } from '@prisma/client';
+import { Patient, Prisma } from '@prisma/client';
 import { FindAllPatientDto } from './dto/find-all-patient.dto';
+import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 
 @Controller('patients')
 @UseGuards(JwtAuthGuard)
@@ -12,17 +13,17 @@ export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
   @Post()
-  create(@Body() createPatientDto: CreatePatientDto) {
+  create(@Body() createPatientDto: CreatePatientDto): Promise<Patient> {
     return this.patientsService.create(createPatientDto);
   }
 
   @Get('dropdown')
-  findDropdown(@Query('search') search?: string) {
+  findDropdown(@Query('search') search?: string): Promise<{ id: string; name: string }[]> {
     return this.patientsService.findDropdown(search);
   }
 
   @Get()
-  findAll(@Query() query: FindAllPatientDto  ) {
+  findAll(@Query() query: FindAllPatientDto): Promise<PaginatedResult<Patient>> {
     const { skip, take, sortBy, sortOrder, name, age } = query;
 
     const where: Prisma.PatientWhereInput = {};
@@ -36,12 +37,12 @@ export class PatientsController {
 
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id') id: string): Promise<Patient> {
     return this.patientsService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
+  update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto): Promise<Patient> {
     return this.patientsService.update({
       where: { id },
       data: updatePatientDto
@@ -49,7 +50,7 @@ export class PatientsController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id') id: string): Promise<Patient> {
     return this.patientsService.remove(id);
   }
 }
