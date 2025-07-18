@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
+import { IsInt, IsNotEmpty, IsString, MinLength } from "class-validator";
 
 export class CreatePatientDto{
     @IsString()
@@ -8,12 +8,4 @@ export class CreatePatientDto{
 
     @IsInt()
     age: number;
-
-    @IsOptional()
-    @IsString()
-    fileName?: string;
-
-    @IsOptional()
-    @IsString()
-    url?: string;
 }
