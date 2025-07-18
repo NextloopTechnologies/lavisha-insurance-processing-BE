@@ -35,7 +35,7 @@ async function bootstrap() {
   // Nest
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('v1');
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
   app.useGlobalFilters(new PrismaExceptionFilter);
 
   const configService = app.get(ConfigService);
