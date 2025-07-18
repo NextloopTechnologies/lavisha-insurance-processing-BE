@@ -31,14 +31,13 @@ export class CommentsService {
         take?: number;
         cursor?: string;
         where?: Prisma.CommentWhereInput;
-        orderBy?: Prisma.CommentOrderByWithRelationInput;
     }): Promise<Comment[]> {
-        const { cursor, take, where, orderBy } = params;
+        const { cursor, take, where } = params;
         return await this.prisma.comment.findMany({
             take,
             ...(cursor && { cursor: { id: cursor }, skip: 1 }),
             where,
-            orderBy,
+            orderBy: { createdAt: 'desc' },
             include: {
                 creator: { select: { id: true, name: true } },
             },

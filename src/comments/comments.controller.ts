@@ -19,8 +19,8 @@ export class CommentsController {
   @Get()
   findAll(@Query() query: FindAllCommentsDto): Promise<Comment[]> {
     const {
-      take, cursor, sortBy, sortOrder,
-      type, insuranceRequestId, createdBy, role
+      take, cursor, type, 
+      insuranceRequestId, createdBy, role
     } = query;
 
     const allowedTypes: Record<Role, CommentType[]> = {
@@ -37,8 +37,6 @@ export class CommentsController {
       type: { in: allowedTypes[role] },
     };
 
-    const orderBy = sortBy ? { [sortBy]: sortOrder } : undefined;
-
-    return this.commentsService.findAll({ take, cursor, where, orderBy });
+    return this.commentsService.findAll({ take, cursor, where });
   }
 }
