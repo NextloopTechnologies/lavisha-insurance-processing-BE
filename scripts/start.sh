@@ -10,5 +10,7 @@ npm run db:setup
 npm run db:seed
 npm run build
 
+npm run db:generate
+
 pm2 delete lavisha-dev 2>/dev/null
 pm2 start dist/src/main.js --name lavisha-dev 
