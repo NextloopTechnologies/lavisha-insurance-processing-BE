@@ -29,7 +29,7 @@ npm run db:seed
 
 # npm run db:generate
 # ✅ Run db:generate if prisma/schema.prisma has changed
-if git diff --name-only origin/main -- prisma/schema.prisma | grep -q .; then
+if git diff --name-only origin/staging -- prisma/schema.prisma | grep -q .; then
   echo "Running db:generate..."
   npm run db:generate
 else
@@ -42,13 +42,12 @@ if (( $(echo "$load > 1.0" | bc -l) )); then
   exit 1
 fi
 
-npm run build
-# if [ ! -d "dist" ]; then
-#   echo "No dist directory. Running build..."
-#   npm run build
-# else
-#   echo "dist/ already exists. Skipping build."
-# fi
+if [ ! -d "dist" ]; then
+  echo "No dist directory. Running build..."
+  npm run build
+else
+  echo "dist/ already exists. Skipping build."
+fi
 
 pm2 delete lavisha-dev 2>/dev/null
 pm2 start dist/src/main.js --name lavisha-dev 
