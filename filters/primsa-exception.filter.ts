@@ -22,6 +22,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         response.status(404).json({
           statusCode: 404,
           message: 'Record not found',
+          error: 'NotFoundError',
           path: request.url,
         });
         break;
@@ -29,6 +30,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         response.status(409).json({
           statusCode: 409,
           message: `Duplicate value for unique field: ${exception.meta?.target}`,
+          error: 'ConflictError',
           path: request.url,
         });
         break;

@@ -6,4 +6,6 @@ export const ALLOWED_MIME_TYPES = [
   'image/webp',
   'image/jpg',
   'application/pdf',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ];
