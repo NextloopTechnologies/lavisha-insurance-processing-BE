@@ -1,4 +1,5 @@
 // scripts/init-db.ts
+import 'dotenv/config';
 import { execSync } from 'child_process';
 import { Client } from 'pg';
 
