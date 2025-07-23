@@ -1,21 +1,29 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request } from '@nestjs/common';
 import { InsuranceRequestsService } from './insurance-requests.service';
 import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { InsuranceRequest, Prisma } from '@prisma/client';
 import { FindAllInsuranceRequestDto } from './dto/find-all-insurance-request.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
+import { MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
 
 @Controller('claims')
+@UseGuards(JwtAuthGuard)
 export class InsuranceRequestsController {
   constructor(private readonly insuranceRequestsService: InsuranceRequestsService) {}
 
   @Post()
-  create(@Body() createInsuranceRequestDto: CreateInsuranceRequestDto): Promise<InsuranceRequest> {
-    return this.insuranceRequestsService.create(createInsuranceRequestDto);
+  create(
+    @Request() req,
+    @Body() createInsuranceRequestDto: CreateInsuranceRequestDto
+  ): Promise<MutateResponseInsuranceRequestDto> {
+    const uploadedBy = req.user.userId;
+    return this.insuranceRequestsService.create(createInsuranceRequestDto, uploadedBy);
   }
 
   @Get()
-    findAll(@Query() query: FindAllInsuranceRequestDto  ) {
+    findAll(@Query() query: FindAllInsuranceRequestDto): Promise<PaginatedResult<InsuranceRequest>> {
       const { skip, take, sortBy, sortOrder, 
         refNumber, doctorName, insuranceCompany, tpaName, assignedTo,
         patientName, status, createdFrom, createdTo
@@ -49,17 +57,20 @@ export class InsuranceRequestsController {
 
   @Patch(':refNumber')
   update(
+    @Request() req,
     @Param('refNumber') refNumber: string, 
     @Body() updateInsuranceRequestDto: UpdateInsuranceRequestDto
-  ): Promise<InsuranceRequest|null> {
+  ): Promise<MutateResponseInsuranceRequestDto> {
+    const uploadedBy = req.user.userId;
     return this.insuranceRequestsService.update({
       where: { refNumber }, 
-      data: updateInsuranceRequestDto
+      data: updateInsuranceRequestDto,
+      uploadedBy
     });
   }
 
   @Delete(':refNumber')
-  remove(@Param('refNumber') refNumber: string) {
+  remove(@Param('refNumber') refNumber: string): Promise<InsuranceRequest> {
     return this.insuranceRequestsService.remove(refNumber);
   }
 }

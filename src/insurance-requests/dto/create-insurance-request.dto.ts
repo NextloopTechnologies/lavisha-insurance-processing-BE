@@ -1,5 +1,22 @@
-import { ClaimStatus } from "@prisma/client";
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { ClaimStatus, DocumentType } from "@prisma/client";
+import { Type } from "class-transformer";
+import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
+
+class CreateDocumentInput {
+    @IsString()
+    @IsOptional()
+    id?: string;
+
+    @IsString()
+    fileName: string;
+
+    @IsEnum(DocumentType)
+    type: DocumentType;
+        
+    @IsOptional()
+    @IsString()
+    remark?: string;
+}
 
 export class CreateInsuranceRequestDto {
     @IsString()
@@ -29,4 +46,9 @@ export class CreateInsuranceRequestDto {
     @IsOptional()
     @IsString()
     additionalNotes?: string;
+
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CreateDocumentInput)
+    documents: CreateDocumentInput[];
 }

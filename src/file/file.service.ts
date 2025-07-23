@@ -16,11 +16,11 @@ export class FileService {
         folder: string
     ): Promise<S3FileUploadResult> {
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-            throw new BadRequestException('Invalid file type');
+            throw new BadRequestException(`Invalid file type. Only the following types are allowed: ${ALLOWED_MIME_TYPES}`);
         }
         
         if (file.size > MAX_FILE_SIZE) {
-            throw new BadRequestException('File too large');
+            throw new BadRequestException(`File too large, Max: ${(MAX_FILE_SIZE/1024)/1024} MB` );
         }
         
         const fileExt = extname(file.originalname);
@@ -61,7 +61,7 @@ export class FileService {
     
     async getPresignedUrl(
         key: string, 
-        expiresInSeconds = 900
+        expiresInSeconds = 10800
     ): Promise<string> {
         const command = new GetObjectCommand({
             Bucket: process.env.AWS_BUCKET_NAME,

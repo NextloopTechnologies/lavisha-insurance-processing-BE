@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Patient, Prisma } from '@prisma/client';
+import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 
 @Injectable()
 export class PatientsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: Prisma.PatientCreateInput) {
+  async create(data: Prisma.PatientCreateInput): Promise<Patient> {
     return await this.prisma.patient.create({ data });
   }
 
@@ -28,14 +29,18 @@ export class PatientsService {
     take?: number;
     where?: Prisma.PatientWhereInput;
     orderBy?: Prisma.PatientOrderByWithRelationInput;
-  }): Promise<Patient[]> {
+  }): Promise<PaginatedResult<Patient>> {
     const { skip, take, where, orderBy } = params;
-    return await this.prisma.patient.findMany({
-      skip,
-      take,
-      where,
-      orderBy,
-    });
+    const [total, data] = await this.prisma.$transaction([
+      this.prisma.patient.count({ where}),
+      this.prisma.patient.findMany({
+        skip,
+        take,
+        where,
+        orderBy,
+      })
+    ])
+    return { total, data }
   }
 
   async findOne(id: string) : Promise<Patient>{
