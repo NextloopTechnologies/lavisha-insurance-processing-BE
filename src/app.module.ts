@@ -9,6 +9,7 @@ import { PatientsModule } from './patients/patients.module';
 import { FileModule } from './file/file.module';
 import { InsuranceRequestsModule } from './insurance-requests/insurance-requests.module';
 import { CommentsModule } from './comments/comments.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { CommentsModule } from './comments/comments.module';
     PatientsModule,
     FileModule,
     InsuranceRequestsModule,
-    CommentsModule
+    CommentsModule,
+    DashboardModule
   ],
   controllers: [AppController],
   providers: [AppService],
