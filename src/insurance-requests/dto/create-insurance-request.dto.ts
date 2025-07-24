@@ -51,6 +51,14 @@ export class CreateInsuranceRequestDto {
     @IsString()
     additionalNotes?: string;
 
+    @IsOptional()
+    @IsString()
+    dischargeSummary?: string;
+
+    @IsOptional()
+    @IsString()
+    settlementSummary?: string;
+
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => CreateDocumentInput)
