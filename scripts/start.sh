@@ -23,10 +23,6 @@ npm run db:setup
 echo "Running db:seed..."
 npm run db:seed
 
-# use SKIP_DB_GENERATE
-echo "Running db:generate..."
-npm run db:generate
-
 cpu_count=$(nproc)
 load=$(uptime | awk -F'load average: ' '{ print $2 }' | cut -d, -f1 | xargs)
 
