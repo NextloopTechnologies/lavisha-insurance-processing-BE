@@ -20,6 +20,14 @@ export class EnvSchema {
 
     @IsOptional()
     @IsBooleanString()
+    SKIP_DB_SETUP?: string
+
+    @IsOptional()
+    @IsBooleanString()
+    SKIP_DB_GENERATE?: string
+
+    @IsOptional()
+    @IsBooleanString()
     SKIP_SEED?: string;
 
     @IsString()

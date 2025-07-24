@@ -1,14 +1,12 @@
-import { IsOptional, IsISO8601 } from 'class-validator';
+import { IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class FilterDashboardDto {
-  @IsOptional()
   @Type(() => Date)
-  @IsISO8601()
-  fromDate?: Date;
+  @IsDate()
+  fromDate: Date;
 
-  @IsOptional()
   @Type(() => Date)
-  @IsISO8601()
-  toDate?: Date;
+  @IsDate()
+  toDate: Date;
 }

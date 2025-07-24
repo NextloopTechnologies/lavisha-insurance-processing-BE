@@ -15,12 +15,15 @@ else
   echo "No dependency changes."
 fi
 
-echo "Running DB setup..."
+# use SKIP_DB_SETUP
+echo "Running db:setup..."
 npm run db:setup
 
 # use SKIP_SEED FLAG
+echo "Running db:seed..."
 npm run db:seed
 
+# use SKIP_DB_GENERATE
 echo "Running db:generate..."
 npm run db:generate
 

@@ -1,6 +1,6 @@
 import { ClaimStatus, DocumentType } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
 
 class CreateDocumentInput {
     @IsString()
@@ -25,6 +25,10 @@ export class CreateInsuranceRequestDto {
     @IsOptional()
     @IsString()
     description?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    isPreAuth?: boolean;
 
     @IsString()
     doctorName: string;
