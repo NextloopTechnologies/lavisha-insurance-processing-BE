@@ -15,14 +15,13 @@ else
   echo "No dependency changes."
 fi
 
-echo "Running DB setup..."
+# use SKIP_DB_SETUP
+echo "Running db:setup..."
 npm run db:setup
 
 # use SKIP_SEED FLAG
+echo "Running db:seed..."
 npm run db:seed
-
-echo "Running db:generate..."
-npm run db:generate
 
 cpu_count=$(nproc)
 load=$(uptime | awk -F'load average: ' '{ print $2 }' | cut -d, -f1 | xargs)
