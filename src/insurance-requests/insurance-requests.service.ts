@@ -146,37 +146,42 @@ export class InsuranceRequestsService {
 
       if(!updatedClaim) throw new BadRequestException("Failed to update claim!")
 
-      if(documents?.length>0){
+      if(documents?.length){
         const newDocs = documents.filter(doc => !doc.id);
         const existingDocs = documents.filter(doc => doc.id);
   
-        updatedDocuments = await Promise.all(
-          existingDocs.map(async doc => {
-            const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
-            if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
-  
-            return this.prisma.document.update({
-              where: { id: doc.id },
-              data: {
-                fileName: doc.fileName,
-                type: doc.type,
-                uploadedBy,
-              },
-              select: { id: true , insuranceRequestId: true , fileName: true , type: true }
-            });
+        if(newDocs?.length){
+          createdDocuments = await this.prisma.document.createManyAndReturn({
+            data: newDocs.map((document) => ({
+              ...document,
+              uploadedBy,
+              insuranceRequestId: updatedClaim.id
+            })),
+            select: { id: true , insuranceRequestId: true , fileName: true , type: true }
           })
-        );
-  
-        createdDocuments = await this.prisma.document.createManyAndReturn({
-          data: newDocs.map((document) => ({
-            ...document,
-            uploadedBy,
-            insuranceRequestId: updatedClaim.id
-          })),
-          select: { id: true , insuranceRequestId: true , fileName: true , type: true }
-        })
+      
+          if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
+        }
+
+        if(existingDocs?.length){
+          updatedDocuments = await Promise.all(
+            existingDocs.map(async doc => {
+              const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
+              if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
     
-        if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
+              return this.prisma.document.update({
+                where: { id: doc.id },
+                data: {
+                  fileName: doc.fileName,
+                  type: doc.type,
+                  uploadedBy,
+                },
+                select: { id: true , insuranceRequestId: true , fileName: true , type: true }
+              });
+            })
+          );
+          if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
+        }
       }
 
       return {
@@ -185,7 +190,7 @@ export class InsuranceRequestsService {
         doctorName: updatedClaim.doctorName,
         tpaName: updatedClaim.tpaName,
         insuranceCompany: updatedClaim.insuranceCompany,
-        documents: [...createdDocuments, ...updatedDocuments]
+        documents: documents?.length ? [...createdDocuments, ...updatedDocuments]: undefined
       };
     }
   
