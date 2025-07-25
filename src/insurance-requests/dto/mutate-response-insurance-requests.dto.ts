@@ -1,8 +1,8 @@
 import { DocumentType } from "@prisma/client"
 import { Type } from "class-transformer"
-import { IsArray, IsEnum, IsString, ValidateNested } from "class-validator"
+import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator"
 
-class DocumentResponseDto {
+export class DocumentResponseDto {
     @IsString()
     id: string
 
@@ -32,8 +32,9 @@ export class MutateResponseInsuranceRequestDto {
     @IsString()
     insuranceCompany: string
 
+    @IsOptional()
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => DocumentResponseDto)
-    documents: DocumentResponseDto[]
+    documents?: DocumentResponseDto[]
 }
