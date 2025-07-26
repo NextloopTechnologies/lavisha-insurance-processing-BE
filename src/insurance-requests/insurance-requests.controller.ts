@@ -7,13 +7,18 @@ import { FindAllInsuranceRequestDto } from './dto/find-all-insurance-request.dto
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @Controller('claims')
+@ApiTags('Claims')
 @UseGuards(JwtAuthGuard)
 export class InsuranceRequestsController {
   constructor(private readonly insuranceRequestsService: InsuranceRequestsService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create an insurance request' })
+  @ApiBody({ type: CreateInsuranceRequestDto })
+  @ApiResponse({ status: 201, type: MutateResponseInsuranceRequestDto })
   create(
     @Request() req,
     @Body() createInsuranceRequestDto: CreateInsuranceRequestDto
@@ -23,6 +28,8 @@ export class InsuranceRequestsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'Get all insurance requests (paginated)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of insurance requests' })
     findAll(@Query() query: FindAllInsuranceRequestDto): Promise<PaginatedResult<InsuranceRequest>> {
       const { skip, take, sortBy, sortOrder, 
         refNumber, doctorName, insuranceCompany, tpaName, assignedTo,
@@ -51,11 +58,16 @@ export class InsuranceRequestsController {
   
 
   @Get(':refNumber')
+  @ApiOperation({ summary: 'Get one insurance request by ref number' })
+  @ApiParam({ name: 'refNumber', example: 'CLM-00001' })
+  @ApiResponse({ status: 200, description: 'Insurance request detail' })
   findOne(@Param('refNumber') refNumber: string): Promise<InsuranceRequest | null> {
     return this.insuranceRequestsService.findOne({ refNumber });
   }
 
   @Patch(':refNumber')
+  @ApiOperation({ summary: 'Update insurance request by ref number, consider Create schema with all fields as optional.' })
+  @ApiResponse({ status: 201, type: MutateResponseInsuranceRequestDto })
   update(
     @Request() req,
     @Param('refNumber') refNumber: string, 
@@ -70,6 +82,8 @@ export class InsuranceRequestsController {
   }
 
   @Delete(':refNumber')
+   @ApiOperation({ summary: 'Delete insurance request by ref number' })
+  @ApiParam({ name: 'refNumber', example: 'CLM-00001' })
   remove(@Param('refNumber') refNumber: string): Promise<InsuranceRequest> {
     return this.insuranceRequestsService.remove(refNumber);
   }
