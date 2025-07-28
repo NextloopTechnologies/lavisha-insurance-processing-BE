@@ -66,6 +66,14 @@ export class CreateInsuranceRequestDto {
     additionalNotes?: string;
 
     @ApiProperty({ type: [CreateDocumentInput] })
+    @IsOptional()
+    @IsString()
+    dischargeSummary?: string;
+
+    @IsOptional()
+    @IsString()
+    settlementSummary?: string;
+
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => CreateDocumentInput)

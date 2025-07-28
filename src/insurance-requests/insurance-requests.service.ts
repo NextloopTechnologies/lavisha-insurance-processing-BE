@@ -4,7 +4,7 @@ import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InsuranceRequest, Prisma } from '@prisma/client';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
-import { MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
+import { DocumentResponseDto, MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
 import { FileService } from 'src/file/file.service';
 
 @Injectable()
@@ -125,6 +125,9 @@ export class InsuranceRequestsService {
   
       const { where, data, uploadedBy } = params;
       const { patientId, documents, ...rest } = data;
+      let updatedDocuments: DocumentResponseDto[] = []
+      let createdDocuments: DocumentResponseDto[] = []
+
       if (patientId) {
         const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
         if (!patient) throw new BadRequestException('Invalid patient ID');
@@ -143,30 +146,42 @@ export class InsuranceRequestsService {
 
       if(!updatedClaim) throw new BadRequestException("Failed to update claim!")
 
-      const incomingDocs = documents ?? []
-      const updatedDocuments = await Promise.all(
-        incomingDocs
-          .filter(doc => doc.id)
-          .map(doc =>
-            this.prisma.document.update({
-              where: { id: doc.id },
-              data: {
-                fileName: doc.fileName,
-                type: doc.type,
-                uploadedBy,
-              },
-              select: {
-                id: true,
-                insuranceRequestId: true,
-                fileName: true,
-                type: true,
-              },
-            })
-          )
-      );
+      if(documents?.length){
+        const newDocs = documents.filter(doc => !doc.id);
+        const existingDocs = documents.filter(doc => doc.id);
+  
+        if(newDocs?.length){
+          createdDocuments = await this.prisma.document.createManyAndReturn({
+            data: newDocs.map((document) => ({
+              ...document,
+              uploadedBy,
+              insuranceRequestId: updatedClaim.id
+            })),
+            select: { id: true , insuranceRequestId: true , fileName: true , type: true }
+          })
+      
+          if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
+        }
 
-      if (!updatedDocuments.length) {
-        throw new BadRequestException("No documents were updated.");
+        if(existingDocs?.length){
+          updatedDocuments = await Promise.all(
+            existingDocs.map(async doc => {
+              const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
+              if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+    
+              return this.prisma.document.update({
+                where: { id: doc.id },
+                data: {
+                  fileName: doc.fileName,
+                  type: doc.type,
+                  uploadedBy,
+                },
+                select: { id: true , insuranceRequestId: true , fileName: true , type: true }
+              });
+            })
+          );
+          if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
+        }
       }
 
       return {
@@ -175,7 +190,7 @@ export class InsuranceRequestsService {
         doctorName: updatedClaim.doctorName,
         tpaName: updatedClaim.tpaName,
         insuranceCompany: updatedClaim.insuranceCompany,
-        documents: updatedDocuments,
+        documents: documents?.length ? [...createdDocuments, ...updatedDocuments]: undefined
       };
     }
   
