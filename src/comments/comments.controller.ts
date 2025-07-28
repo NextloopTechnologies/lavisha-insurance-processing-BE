@@ -39,10 +39,10 @@ export class CommentsController {
     } = query;
 
     const allowedTypes: Record<Role, CommentType[]> = {
-      SUPER_ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE'],
-      ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE'],
-      HOSPITAL_MANAGER: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE'],
-      HOSPITAL: ['NOTE', 'QUERY', 'TPA_REPLY'],
+      SUPER_ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE','SYSTEM'],
+      ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
+      HOSPITAL_MANAGER: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
+      HOSPITAL: ['QUERY', 'TPA_REPLY','SYSTEM'],
     };
 
     const where: Prisma.CommentWhereInput = {
