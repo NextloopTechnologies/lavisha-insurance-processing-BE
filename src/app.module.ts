@@ -10,6 +10,7 @@ import { FileModule } from './file/file.module';
 import { InsuranceRequestsModule } from './insurance-requests/insurance-requests.module';
 import { CommentsModule } from './comments/comments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     FileModule,
     InsuranceRequestsModule,
     CommentsModule,
-    DashboardModule
+    DashboardModule,
+    DocumentsModule
   ],
   controllers: [AppController],
   providers: [AppService],

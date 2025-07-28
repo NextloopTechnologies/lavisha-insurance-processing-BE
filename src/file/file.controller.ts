@@ -3,9 +3,11 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FileService } from './file.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { DeleteFilesDto } from './dto/delete-files.dto';
-import { S3FileUploadResult } from 'src/common/interfaces/s3.interface';
+import { S3FileUploadResult, S3FileUploadResultDto } from 'src/common/interfaces/s3.interface';
 import { DeleteObjectsCommandOutput } from '@aws-sdk/client-s3';
+import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('File')
 @Controller('file')
 @UseGuards(JwtAuthGuard)
 export class FileController {
@@ -13,6 +15,25 @@ export class FileController {
 
     @Post('upload')
     @UseInterceptors(FileInterceptor('file'))
+    @ApiOperation({ summary: 'Upload a single file' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+        type: 'object',
+        properties: {
+            file: {
+                type: 'string',
+                format: 'binary',
+            },
+            folder: {
+                type: 'string',
+                    enum: ['profiles', 'claims'],
+                    example: 'profiles',
+                },
+            },
+        },
+    })
+    @ApiResponse({ status: 201, type: S3FileUploadResultDto })
     async uploadFile(
         @UploadedFile() file: Express.Multer.File,
         @Body('folder') folder: string
@@ -29,6 +50,28 @@ export class FileController {
 
     @Post('bulkUpload')
     @UseInterceptors(FilesInterceptor('files', 7))
+    @ApiOperation({ summary: 'Upload multiple files (max 6)' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                files: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                        format: 'binary',
+                    },
+                },
+                folder: {
+                    type: 'string',
+                    enum: ['profiles', 'claims'],
+                    example: 'claims',
+                },
+            },
+        },
+    })
+    @ApiResponse({ status: 200, type: [S3FileUploadResultDto] })
     async uploadMultiple(
         @UploadedFiles() files: Express.Multer.File[],
         @Body('folder') folder: string
@@ -40,12 +83,9 @@ export class FileController {
         return this.fileService.uploadMultipleFiles(files, `${folder}/`);
     }
 
-    @Get(':fileName')
-    async getUrl(@Param('fileName') fileName: string) {
-        return this.fileService.getPresignedUrl('claims/c6ad876e-867d-457c-9fda-afdc549adafb.jpg')
-    }   
-
     @Delete('bulkDelete')
+    @ApiOperation({ summary: 'Delete multiple files by file name' })
+    @ApiBody({ type: DeleteFilesDto })
     async bulkDelete(
         @Body() deleteFilesDto: DeleteFilesDto
     ): Promise<DeleteObjectsCommandOutput>{

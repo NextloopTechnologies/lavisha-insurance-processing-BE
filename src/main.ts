@@ -7,6 +7,7 @@ import { plainToInstance } from 'class-transformer';
 import { EnvSchema } from './config/env.validation';
 import { validateSync } from 'class-validator';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   
@@ -37,6 +38,25 @@ async function bootstrap() {
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
   app.useGlobalFilters(new PrismaExceptionFilter);
+
+  const config = new DocumentBuilder()
+    .setTitle('Larisha APIs')
+    .setDescription('API documentation for Larisha Healthcare Platform')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        in: 'header',
+      },
+      'access_token',
+    ) 
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api-docs', app, document);
 
   const configService = app.get(ConfigService);
   const PORT = configService.get<number>('PORT') || 8000;
