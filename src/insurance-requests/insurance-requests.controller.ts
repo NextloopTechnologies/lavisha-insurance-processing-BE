@@ -24,7 +24,8 @@ export class InsuranceRequestsController {
     @Body() createInsuranceRequestDto: CreateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
     const uploadedBy = req.user.userId;
-    return this.insuranceRequestsService.create(createInsuranceRequestDto, uploadedBy);
+    const userName = req.user.name;
+    return this.insuranceRequestsService.create(createInsuranceRequestDto, uploadedBy, userName);
   }
 
   @Get()
@@ -74,10 +75,12 @@ export class InsuranceRequestsController {
     @Body() updateInsuranceRequestDto: UpdateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
     const uploadedBy = req.user.userId;
+    const userName = req.user.name;
     return this.insuranceRequestsService.update({
       where: { refNumber }, 
       data: updateInsuranceRequestDto,
-      uploadedBy
+      uploadedBy,
+      userName,
     });
   }
 
