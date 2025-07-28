@@ -7,13 +7,13 @@ cd /home/ec2-user/workspace/lavisha-dev
 
 #npm install
 # Only when new packages are added
-if ! cmp -s package-lock.json last-install.lock; then
-  echo "Dependencies changed, running install"
-  npm ci
-  cp package-lock.json last-install.lock
-else
-  echo "No dependency changes."
-fi
+# if ! cmp -s package-lock.json last-install.lock; then
+echo "Dependencies changed, running install"
+npm ci
+cp package-lock.json last-install.lock
+# else
+#   echo "No dependency changes."
+# fi
 
 # use SKIP_DB_SETUP
 echo "Running db:setup..."
