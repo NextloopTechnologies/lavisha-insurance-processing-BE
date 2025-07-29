@@ -100,8 +100,7 @@ export class InsuranceRequestsService {
         include: {
           patient: { select: { id: true, name: true } },
           documents: true,
-          enhancements: true,
-          comments: true,
+          enhancements: { include: { documents: true }}
         },
       });
 
@@ -114,6 +113,27 @@ export class InsuranceRequestsService {
         );
         insuranceRequest.documents = updatedDocuments;
       }
+      if (insuranceRequest.enhancements?.length > 0) {
+        const enhancementDocs = insuranceRequest.enhancements.map(enhancement => enhancement.documents).flat()
+        if(enhancementDocs.length>0){
+          const updatedDocuments = await Promise.all(
+            enhancementDocs.map(async (doc) => {
+              const url = await this.fileService.getPresignedUrl(doc.fileName);
+              return { ...doc, url };
+            })
+          );
+          insuranceRequest.enhancements = insuranceRequest.enhancements.map((enhancement) => {
+            const updatedDocsForEnhancement = updatedDocuments.filter(
+              (doc) => doc.enhancementId === enhancement.id
+            );
+            return {
+              ...enhancement,
+              documents: updatedDocsForEnhancement,
+            };
+          });
+        }
+      }
+
       return insuranceRequest;
     }
     

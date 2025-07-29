@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { ClaimStatus, DocumentType } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, ValidateNested } from "class-validator";
 
 class CreateDocumentInput {
     @ApiPropertyOptional({ example: 'doc-uuid' })
@@ -23,47 +23,29 @@ class CreateDocumentInput {
     remark?: string;
 }
 
-export class CreateInsuranceRequestDto {
-    @ApiProperty({ example: 'patient-uuid' })
+export class CreateEnhancementDto {
+    @ApiProperty({ example: 'claim-uuid' })
     @IsString()
-    patientId: string;
-
-    @ApiPropertyOptional({ example: 'Some description...' })
+    insuranceRequestId: string;
+    
+    @ApiProperty({ example: 4 })
+    @IsInt()
+    numberOfDays: number;
+    
+    @ApiPropertyOptional({ example: 'Dr. John Smith' })
     @IsOptional()
     @IsString()
-    description?: string;
-
-    @ApiPropertyOptional({ example: true })
-    @IsOptional()
-    @IsBoolean()
-    isPreAuth?: boolean;
-
-    @ApiProperty({ example: 'Dr. John Smith' })
-    @IsString()
-    doctorName: string;
-
-    @ApiProperty({ example: 'RAKSHA_TPA' })
-    @IsString()
-    tpaName: string;
-
-    @ApiProperty({ example: 'KOTAK' })
-    @IsString()
-    insuranceCompany: string;
-
-    @ApiProperty({ example: 'assigned-to-uuid' })
+    doctorName?: string;
+    
+    @ApiPropertyOptional({ example: 'Some notes...' })
     @IsOptional()
     @IsString()
-    assignedTo?: string;
+    notes?: string;
 
     @ApiPropertyOptional({ enum: ClaimStatus, example: ClaimStatus.SENT_TO_TPA })
     @IsOptional()
     @IsEnum(ClaimStatus)
     status?: ClaimStatus;
-
-    @ApiPropertyOptional({ example: "Some notes..."})
-    @IsOptional()
-    @IsString()
-    additionalNotes?: string;
 
     @ApiPropertyOptional({ example: 'Discharge summary...' })
     @IsOptional()

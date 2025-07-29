@@ -11,6 +11,7 @@ import { InsuranceRequestsModule } from './insurance-requests/insurance-requests
 import { CommentsModule } from './comments/comments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DocumentsModule } from './documents/documents.module';
+import { EnhancementsModule } from './enhancements/enhancements.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { DocumentsModule } from './documents/documents.module';
     InsuranceRequestsModule,
     CommentsModule,
     DashboardModule,
-    DocumentsModule
+    DocumentsModule,
+    EnhancementsModule
   ],
   controllers: [AppController],
   providers: [AppService],
