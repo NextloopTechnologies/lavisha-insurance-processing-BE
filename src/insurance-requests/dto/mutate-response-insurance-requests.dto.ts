@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger"
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger"
 import { DocumentType } from "@prisma/client"
 import { Type } from "class-transformer"
 import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator"
@@ -11,6 +11,10 @@ export class DocumentResponseDto {
     @ApiProperty({ example: 'insuranceRequest-uuid'})
     @IsString()
     insuranceRequestId: string
+
+    @ApiPropertyOptional({ example: 'enhancement-uuid'})
+    @IsString()
+    enhancementId?: string
 
     @ApiProperty({ example: 'folder/fileName.pdf'})
     @IsString()

@@ -55,9 +55,11 @@ model Document {
   remark      String?
   uploadedBy  String
   insuranceRequestId String
+  enhancementId String?
   uploadedAt  DateTime @default(now())
   uploader    User    @relation(fields: [uploadedBy], references: [id])
   insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
+  enhancement Enhancement? @relation(fields: [enhancementId], references: [id])
 }
 
 enum DocumentType {
@@ -110,10 +112,15 @@ enum ClaimStatus {
 model Enhancement {
   id                 String   @id @default(uuid())
   insuranceRequestId String
+  numberOfDays       Int
+  doctorName         String?
   raisedAt           DateTime @default(now())
   respondedAt        DateTime?
-  status             ClaimStatus @default(PENDING)
   notes              String?
+  dischargeSummary   String?
+  settlementSummary  String?
+  status             ClaimStatus @default(PENDING)
+  documents          Document[] 
   insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
 }
 
