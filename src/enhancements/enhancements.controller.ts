@@ -1,6 +1,6 @@
 import { Body, Controller, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { EnhancementsService } from './enhancements.service';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CreateEnhancementDto } from './dto/create-enhancements.dto';
 import { MutateEnhancementsResponseDto } from './dto/mutate-enhancements-response.dto';
@@ -9,6 +9,7 @@ import { UpdateEnhancementDto } from './dto/update-enhancements.dto';
 @Controller('enhancements')
 @UseGuards(JwtAuthGuard)
 @ApiTags("Enhancements")
+@ApiBearerAuth('access_token')
 export class EnhancementsController {
   constructor(private readonly enhancementsService: EnhancementsService) {}
 

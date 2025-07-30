@@ -4,11 +4,12 @@ import { CreateCommentsDto } from './dto/create-comments.dto';
 import { Comment, CommentType, Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { FindAllCommentsDto } from './dto/find-all-comments.dto';
-import { ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags("Comments")
 @Controller('comments')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth('access_token')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 

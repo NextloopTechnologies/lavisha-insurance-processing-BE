@@ -27,9 +27,14 @@ model User {
   email String @unique 
   password String 
   name String 
-  role Role 
-  tokens String[] @default([])
+  address String?
+  profileFileName String?
+  profileUrl String?
+  rateListFileName String?
+  rateListUrl String?
   hospitalName String?
+  role Role
+  tokens String[] @default([])
   createdAt DateTime @default(now()) 
   updatedAt DateTime @updatedAt 
   documents Document[]
@@ -56,10 +61,12 @@ model Document {
   uploadedBy  String
   insuranceRequestId String
   enhancementId String?
+  queryId String?
   uploadedAt  DateTime @default(now())
   uploader    User    @relation(fields: [uploadedBy], references: [id])
   insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
   enhancement Enhancement? @relation(fields: [enhancementId], references: [id])
+  query Query? @relation(fields: [queryId], references: [id])
 }
 
 enum DocumentType {
@@ -94,6 +101,7 @@ model InsuranceRequest {
   enhancements Enhancement[]
   comments    Comment[]
   documents   Document[]
+  queries     Query[]
   patient     Patient  @relation(fields: [patientId], references: [id])
 }
 
@@ -121,7 +129,19 @@ model Enhancement {
   settlementSummary  String?
   status             ClaimStatus @default(PENDING)
   documents          Document[] 
+  queries            Query[]
   insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+}
+
+model Query {
+  id                 String   @id @default(uuid())
+  insuranceRequestId String
+  enhancementId      String?
+  notes              String?
+  raisedAt           DateTime @default(now())
+  documents          Document[] 
+  insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+  enhancement Enhancement? @relation(fields: [enhancementId], references: [id])
 }
 
 model Comment {
@@ -152,7 +172,6 @@ model Notification {
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id])
 }
-
 
 model ActivityLog {
   id          String   @id @default(uuid())
