@@ -12,6 +12,7 @@ import { CommentsModule } from './comments/comments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DocumentsModule } from './documents/documents.module';
 import { EnhancementsModule } from './enhancements/enhancements.module';
+import { QueriesModule } from './queries/queries.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { EnhancementsModule } from './enhancements/enhancements.module';
     CommentsModule,
     DashboardModule,
     DocumentsModule,
-    EnhancementsModule
+    EnhancementsModule,
+    QueriesModule
   ],
   controllers: [AppController],
   providers: [AppService],
