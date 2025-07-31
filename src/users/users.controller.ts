@@ -1,13 +1,14 @@
-import { Controller, Get, UseGuards, Request, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, UseGuards, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-users.dto';
 import { UpdateUserDto } from './dto/update-users.dto';
-import { Prisma, User } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { FindAllUserDto } from './dto/find-all-users.dto';
 import { MutateUserResponseDto } from './dto/mutate-users-response.dto';
+import { DropdownUsersDto, DropdownUsersResponseDto } from './dto/dropdown-users.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -21,6 +22,19 @@ export class UsersController {
     @ApiResponse({ status: 201, type: MutateUserResponseDto })
     register(@Body() body: CreateUserDto):  Promise<MutateUserResponseDto>{
         return this.usersService.create(body)
+    }
+
+    @Get('dropdown')
+    @ApiOperation({ summary: 'Dropdown list of users (id & name)' })
+    @ApiResponse({ status: 200, type: DropdownUsersResponseDto })
+    findDropdown(@Query() query: DropdownUsersDto ): Promise<DropdownUsersResponseDto[]> {
+        const { search, role } = query
+
+        const where:Prisma.UserWhereInput = {} 
+        if (search) where.name = { contains: search, mode: 'insensitive' };
+        if (role) where.role = role;
+
+        return this.usersService.findDropdown(where);
     }
 
     @Get()

@@ -14,7 +14,7 @@ export class EnhancementsController {
   constructor(private readonly enhancementsService: EnhancementsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create en enhancement' })
+  @ApiOperation({ summary: 'Create an enhancement' })
   @ApiBody({ type: CreateEnhancementDto })
   @ApiResponse({ status: 201, type: MutateEnhancementsResponseDto })
   create(
@@ -26,7 +26,7 @@ export class EnhancementsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update enhacement by uuid, consider Create schema with all fields as optional.' })
+  @ApiOperation({ summary: 'Update an enhancement by uuid, consider Create schema with all fields as optional.' })
   @ApiResponse({ status: 201, type: MutateEnhancementsResponseDto })
   update(
     @Request() req,

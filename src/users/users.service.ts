@@ -1,10 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { MutateUserResponseDto } from './dto/mutate-users-response.dto';
 import { FileService } from 'src/file/file.service';
+import { DropdownUsersResponseDto } from './dto/dropdown-users.dto';
 
 @Injectable()
 export class UsersService {
@@ -13,7 +14,9 @@ export class UsersService {
         private fileService: FileService
     ){}
 
-    async create(data: Prisma.UserCreateInput): Promise<MutateUserResponseDto> {
+    async create(
+        data: Prisma.UserCreateInput
+    ): Promise<MutateUserResponseDto> {
         const existingUser = await this.prisma.user.findUnique({
             where: { email: data.email.toLowerCase() },
         });
@@ -36,6 +39,19 @@ export class UsersService {
                 rateListUrl: true,
                 role: true,
             }
+        });
+    }
+
+    async findDropdown(
+        where?: Prisma.UserWhereInput
+    ): Promise<DropdownUsersResponseDto[]> {
+        return this.prisma.user.findMany({
+            where,
+            select: {
+                id: true,
+                name: true
+            },
+            take: 20,
         });
     }
 
@@ -133,7 +149,9 @@ export class UsersService {
         })
     }
 
-    async remove(where: Prisma.UserWhereUniqueInput): Promise<MutateUserResponseDto>{
+    async remove(
+        where: Prisma.UserWhereUniqueInput
+    ): Promise<MutateUserResponseDto>{
         return this.prisma.user.delete({
             where,
             select: {

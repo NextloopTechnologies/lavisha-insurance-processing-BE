@@ -22,7 +22,8 @@ export class QueriesService {
     const createdQuery = await this.prisma.query.create({ 
       data : { 
         ...rest, 
-        insuranceRequest: { connect: { id: insuranceRequestId }}
+        insuranceRequest: { connect: { id: insuranceRequestId }},
+        enhancement: enhancementId ? { connect: { id: enhancementId }} : undefined
       },
       include: { 
         insuranceRequest: { select: { id: true, refNumber: true, status: true }}
@@ -47,6 +48,7 @@ export class QueriesService {
     return {
       id: createdQuery.id,
       refNumber: createdQuery.insuranceRequest.refNumber,
+      enhancementId: enhancementId ? enhancementId : undefined,
       notes: createdQuery.notes ? createdQuery.notes : undefined, 
       documents: createdDocuments
     }
@@ -119,6 +121,7 @@ export class QueriesService {
     return {
       id: updatedQuery.id,
       refNumber: updatedQuery.insuranceRequest.refNumber,
+      enhancementId: updatedQuery.enhancementId ? updatedQuery.enhancementId : undefined,
       notes: updatedQuery.notes ? updatedQuery.notes : undefined, 
       documents: documents?.length ? [...createdDocuments, ...updatedDocuments]: undefined
     };
