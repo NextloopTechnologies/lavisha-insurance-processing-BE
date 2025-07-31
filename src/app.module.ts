@@ -13,6 +13,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { DocumentsModule } from './documents/documents.module';
 import { EnhancementsModule } from './enhancements/enhancements.module';
 import { QueriesModule } from './queries/queries.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { QueriesModule } from './queries/queries.module';
     DashboardModule,
     DocumentsModule,
     EnhancementsModule,
-    QueriesModule
+    QueriesModule,
+    NotificationsModule
   ],
   controllers: [AppController],
   providers: [AppService],
