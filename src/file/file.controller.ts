@@ -5,11 +5,12 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { DeleteFilesDto } from './dto/delete-files.dto';
 import { S3FileUploadResult, S3FileUploadResultDto } from 'src/common/interfaces/s3.interface';
 import { DeleteObjectsCommandOutput } from '@aws-sdk/client-s3';
-import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('File')
 @Controller('file')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth('access_token')
 export class FileController {
     constructor(private readonly fileService: FileService) {}
 
@@ -27,7 +28,7 @@ export class FileController {
             },
             folder: {
                 type: 'string',
-                    enum: ['profiles', 'claims'],
+                    enum: ['profiles', 'claims', 'hospitals'],
                     example: 'profiles',
                 },
             },
@@ -41,8 +42,8 @@ export class FileController {
         if(!file) {
             throw new BadRequestException("File ['file'] is required!")
         }
-        if(!['profiles', 'claims'].includes(folder)) {
-            throw new BadRequestException('Invalid folder. Only "profiles" or "claims" allowed.');
+        if(!['profiles', 'claims','hospitals'].includes(folder)) {
+            throw new BadRequestException('Invalid folder. Only "profiles", "claims" or "hospitals" allowed.');
         }
 
         return this.fileService.uploadFile(file, `${folder}/`);
@@ -65,7 +66,7 @@ export class FileController {
                 },
                 folder: {
                     type: 'string',
-                    enum: ['profiles', 'claims'],
+                    enum: ['profiles', 'claims','hospitals'],
                     example: 'claims',
                 },
             },
@@ -77,8 +78,8 @@ export class FileController {
         @Body('folder') folder: string
     ): Promise<S3FileUploadResult[]> {
         if (!files?.length || files?.length>6) throw new BadRequestException('Upload atleast 1 or max 5 files!');
-        if(!['profiles', 'claims'].includes(folder)) {
-            throw new BadRequestException('Invalid folder. Only "profiles" or "claims" allowed.');
+        if(!['profiles', 'claims', 'hospitals'].includes(folder)) {
+            throw new BadRequestException('Invalid folder. Only "profiles", "claims" or "hospitals" allowed.');
         }
         return this.fileService.uploadMultipleFiles(files, `${folder}/`);
     }

@@ -3,10 +3,12 @@ import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { FilterDashboardDto } from './dto/filter-dashboard.dto';
 import { Role } from '@prisma/client';
-import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Dashboard')
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth('access_token')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 

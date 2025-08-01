@@ -7,11 +7,12 @@ import { FindAllInsuranceRequestDto } from './dto/find-all-insurance-request.dto
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @Controller('claims')
 @ApiTags('Claims')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth('access_token')
 export class InsuranceRequestsController {
   constructor(private readonly insuranceRequestsService: InsuranceRequestsService) {}
 

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { InsuranceRequest, Prisma } from '@prisma/client';
+import { Document, InsuranceRequest, Prisma } from '@prisma/client';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { DocumentResponseDto, MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
 import { FileService } from 'src/file/file.service';
@@ -109,6 +109,15 @@ export class InsuranceRequestsService {
       return { total, data } 
     }
   
+    async addPresignedUrls(docs: Document[]) {
+      return await Promise.all(
+        docs.map(async (doc) => ({
+          ...doc,
+          url: await this.fileService.getPresignedUrl(doc.fileName)
+        }))
+      );
+    }
+
     async findOne(
       insuranceRequestWhereUniqueInput: Prisma.InsuranceRequestWhereUniqueInput
     ) : Promise<InsuranceRequest | null> {
@@ -117,40 +126,63 @@ export class InsuranceRequestsService {
         include: {
           patient: { select: { id: true, name: true } },
           documents: true,
+          queries: { include: { documents: true }},
           enhancements: { include: { documents: true }}
         },
       });
 
       if (insuranceRequest.documents?.length > 0) {
-        const updatedDocuments = await Promise.all(
-          insuranceRequest.documents.map(async (doc) => {
-            const url = await this.fileService.getPresignedUrl(doc.fileName);
-            return { ...doc, url };
-          })
+        //keep only main claim documents and remove query,enhancements 
+        insuranceRequest.documents = insuranceRequest.documents.filter(
+          (doc) => !doc.enhancementId && !doc.queryId
         );
-        insuranceRequest.documents = updatedDocuments;
+        insuranceRequest.documents = await this.addPresignedUrls(insuranceRequest.documents)
       }
-      if (insuranceRequest.enhancements?.length > 0) {
-        const enhancementDocs = insuranceRequest.enhancements.map(enhancement => enhancement.documents).flat()
-        if(enhancementDocs.length>0){
-          const updatedDocuments = await Promise.all(
-            enhancementDocs.map(async (doc) => {
-              const url = await this.fileService.getPresignedUrl(doc.fileName);
-              return { ...doc, url };
-            })
-          );
-          insuranceRequest.enhancements = insuranceRequest.enhancements.map((enhancement) => {
-            const updatedDocsForEnhancement = updatedDocuments.filter(
-              (doc) => doc.enhancementId === enhancement.id
-            );
-            return {
-              ...enhancement,
-              documents: updatedDocsForEnhancement,
-            };
-          });
+
+      // Separate enhancement-linked queries from top-level ones
+      const enhancementQueryMap = new Map<string, any[]>();
+
+      if (insuranceRequest.queries.length > 0) {
+        //keep only main claim queries and remove enhancements  
+        insuranceRequest.queries = insuranceRequest.queries.filter((query) => {
+          if (query.enhancementId) {
+            const arr = enhancementQueryMap.get(query.enhancementId) || [];
+            arr.push(query);
+            enhancementQueryMap.set(query.enhancementId, arr);
+            return false; // remove from top-level
+          }
+          return true; // keep in top-level
+        });
+
+        for (const query of insuranceRequest.queries) {
+          if (query.documents.length > 0) {
+            query.documents = await this.addPresignedUrls(query.documents)
+          }
         }
       }
 
+      if (insuranceRequest.enhancements.length > 0) {
+        for (const enhancement of insuranceRequest.enhancements) {
+          if (enhancement.documents.length > 0) {
+            //filter query from enhancement documents
+            enhancement.documents = enhancement.documents.filter(
+              (doc) => !doc.queryId
+            );
+            enhancement.documents = await this.addPresignedUrls(enhancement.documents)
+          }
+
+          // Attach enhancement-specific queries
+          const queries = enhancementQueryMap.get(enhancement.id) || [];
+          for (const query of queries) {
+            if (query.documents.length > 0) {
+              query.documents = await this.addPresignedUrls(query.documents);
+            }
+          }
+
+          // Inject the queries under each enhancement
+          (enhancement as any).queries = queries;
+        }
+      }
       return insuranceRequest;
     }
     
