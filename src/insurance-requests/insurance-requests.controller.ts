@@ -34,7 +34,7 @@ export class InsuranceRequestsController {
   @ApiResponse({ status: 200, description: 'Paginated list of insurance requests' })
     findAll(@Query() query: FindAllInsuranceRequestDto): Promise<PaginatedResult<InsuranceRequest>> {
       const { skip, take, sortBy, sortOrder, 
-        refNumber, doctorName, insuranceCompany, tpaName, assignedTo,
+        refNumber, doctorName, insuranceCompany, tpaName, assigneeName,
         patientName, status, createdFrom, createdTo
       } = query;
   
@@ -43,9 +43,9 @@ export class InsuranceRequestsController {
       if (doctorName) where.doctorName = { contains: doctorName, mode: 'insensitive' };
       if (insuranceCompany) where.insuranceCompany = { contains: insuranceCompany, mode: 'insensitive' };
       if (tpaName) where.tpaName = { contains: tpaName, mode: 'insensitive' };
-      if (assignedTo) where.assignedTo = { contains: assignedTo, mode: 'insensitive' };
-      if (patientName) where.patient = { name: { contains: patientName, mode: 'insensitive' } };
-      if (status) where.status = status;
+      if (assigneeName) where.user = { name: { contains: assigneeName, mode: 'insensitive' }};
+      if (patientName) where.patient = { name: { contains: patientName, mode: 'insensitive' }};
+      if (status  && status.length > 0) where.status = { in: status };
       if (createdFrom || createdTo) {
         where.createdAt = {
           ...(createdFrom && { gte: new Date(createdFrom) }),
