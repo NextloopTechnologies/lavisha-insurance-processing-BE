@@ -5,7 +5,6 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { Patient, Prisma } from '@prisma/client';
 import { FindAllPatientDto } from './dto/find-all-patient.dto';
-import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { ApiBearerAuth, ApiBody, ApiExtraModels, ApiOperation, ApiProperty, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Patients')
@@ -32,7 +31,7 @@ export class PatientsController {
 
   @Get()
   @ApiOperation({ summary: 'Get paginated list of patients' })
-  findAll(@Query() query: FindAllPatientDto): Promise<PaginatedResult<Patient>> {
+  findAll(@Query() query: FindAllPatientDto) {
     const { skip, take, sortBy, sortOrder, name, age } = query;
 
     const where: Prisma.PatientWhereInput = {};

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Patient, Prisma } from '@prisma/client';
-import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
+import { ClaimStatus, Patient, Prisma, Role } from '@prisma/client';
 
 @Injectable()
 export class PatientsService {
@@ -29,7 +28,7 @@ export class PatientsService {
     take?: number;
     where?: Prisma.PatientWhereInput;
     orderBy?: Prisma.PatientOrderByWithRelationInput;
-  }): Promise<PaginatedResult<Patient>> {
+  }) {
     const { skip, take, where, orderBy } = params;
     const [total, patients] = await this.prisma.$transaction([
       this.prisma.patient.count({ where}),
@@ -39,20 +38,22 @@ export class PatientsService {
         where,
         orderBy,
         include: {
-          insuranceRequests: { select: { refNumber: true }}
+          insuranceRequests: { select: { refNumber: true , status: true }}
         }
       })
     ])
     const data = patients.map((patient) => {
       const requestCount = patient.insuranceRequests.length;
+      const singleClaim = requestCount === 1 ? patient.insuranceRequests[0] : null;
+
       return {
         ...patient,
         insuranceRequests: undefined,
         claimCount: requestCount,
-        singleClaimRefNumber: requestCount === 1 ? patient.insuranceRequests[0].refNumber : null,
+        singleClaimRefNumber: singleClaim?.refNumber ?? null,
+        isClaimStatusDraft: singleClaim?.status === ClaimStatus.DRAFT
       };
     });
-
     return { total, data }
   }
 
