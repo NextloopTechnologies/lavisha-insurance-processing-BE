@@ -31,15 +31,28 @@ export class PatientsService {
     orderBy?: Prisma.PatientOrderByWithRelationInput;
   }): Promise<PaginatedResult<Patient>> {
     const { skip, take, where, orderBy } = params;
-    const [total, data] = await this.prisma.$transaction([
+    const [total, patients] = await this.prisma.$transaction([
       this.prisma.patient.count({ where}),
       this.prisma.patient.findMany({
         skip,
         take,
         where,
         orderBy,
+        include: {
+          insuranceRequests: { select: { id: true }}
+        }
       })
     ])
+    const data = patients.map((patient) => {
+      const requestCount = patient.insuranceRequests.length;
+      return {
+        ...patient,
+        insuranceRequests: undefined,
+        claimCount: requestCount,
+        singleClaimId: requestCount === 1 ? patient.insuranceRequests[0].id : null,
+      };
+    });
+
     return { total, data }
   }
 

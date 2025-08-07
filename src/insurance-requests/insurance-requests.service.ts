@@ -33,7 +33,7 @@ export class InsuranceRequestsService {
     uploadedBy: string,
     userName: string
   ): Promise<MutateResponseInsuranceRequestDto> {
-    const { patientId, documents, ...rest } = data;
+    const { patientId, assignedTo, documents, ...rest } = data;
     const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) throw new BadRequestException('Invalid patient ID');
 
@@ -41,7 +41,8 @@ export class InsuranceRequestsService {
    
     const createdClaim = await this.prisma.insuranceRequest.create({ 
       data : { 
-        ...rest, 
+        ...rest,
+        ...(assignedTo && { user: { connect: { id: assignedTo } } }),
         patient: { connect: { id: patientId }}, 
         refNumber 
       },
@@ -194,7 +195,7 @@ export class InsuranceRequestsService {
     }): Promise<MutateResponseInsuranceRequestDto> {
   
       const { where, data, uploadedBy, userName } = params;
-      const { patientId, documents, ...rest } = data;
+      const { patientId, assignedTo, documents, ...rest } = data;
       let updatedDocuments: DocumentResponseDto[] = []
       let createdDocuments: DocumentResponseDto[] = []
 
@@ -210,7 +211,8 @@ export class InsuranceRequestsService {
         where,
         data: {
           ...rest,
-          ...(patientId && { patient: { connect: { id: patientId } } }),
+          ...(assignedTo && { user: { connect: { id: assignedTo } } }),
+          ...(patientId && { patient: { connect: { id: patientId } } })
         },
         include: {
           patient: { select: { id: true, name: true }},

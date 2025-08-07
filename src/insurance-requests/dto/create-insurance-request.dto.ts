@@ -75,6 +75,22 @@ export class CreateInsuranceRequestDto {
     @IsString()
     settlementSummary?: string;
 
+    @ApiPropertyOptional({ 
+        example: '85000.50', 
+        description: ' or 85000 no comma separated like 8,500' 
+    })
+    @IsOptional()
+    @IsString()
+    settlementAmount?: string;
+
+    @ApiPropertyOptional({ 
+        example: '85000.50', 
+        description: ' or 85000 no comma separated like 8,500' 
+    })
+    @IsOptional()
+    @IsString()
+    actualQuotedAmount?: string;
+
     @ApiProperty({ type: [CreateDocumentInput] })
     @IsArray()
     @ValidateNested({ each: true })

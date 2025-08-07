@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
@@ -100,12 +100,14 @@ export class UsersService {
                 role: true,
             }
         })
-        const url = await this.fileService.getPresignedUrl(result.rateListFileName);
+        let rateListUrl: string;
+        if(result.role===Role.HOSPITAL && result.rateListFileName){
+            rateListUrl = await this.fileService.getPresignedUrl(result.rateListFileName);
+        }
         return {
             ...result,
-            rateListUrl: url
+            rateListUrl: rateListUrl ? rateListUrl : null
         }
-
     }
 
     async update(params: {
