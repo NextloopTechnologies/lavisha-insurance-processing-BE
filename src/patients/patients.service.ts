@@ -39,7 +39,7 @@ export class PatientsService {
         where,
         orderBy,
         include: {
-          insuranceRequests: { select: { id: true }}
+          insuranceRequests: { select: { refNumber: true }}
         }
       })
     ])
@@ -49,7 +49,7 @@ export class PatientsService {
         ...patient,
         insuranceRequests: undefined,
         claimCount: requestCount,
-        singleClaimId: requestCount === 1 ? patient.insuranceRequests[0].id : null,
+        singleClaimRefNumber: requestCount === 1 ? patient.insuranceRequests[0].refNumber : null,
       };
     });
 
