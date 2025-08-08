@@ -50,9 +50,9 @@ model Patient {
   age           Int
   url           String?
   fileName      String?
-  hospitalUserId String
+  hospitalUserId String?
   createdAt     DateTime @default(now())
-  hospital User @relation(fields: [hospitalUserId], references: [id])
+  hospital User? @relation(fields: [hospitalUserId], references: [id])
   insuranceRequests InsuranceRequest[]
 }
 
