@@ -41,6 +41,7 @@ model User {
   comments Comment[]
   notifications Notification[]
   insuranceRequests InsuranceRequest[]
+  patients Patient[]
 } 
 
 model Patient {
@@ -49,7 +50,9 @@ model Patient {
   age           Int
   url           String?
   fileName      String?
+  hospitalUserId String
   createdAt     DateTime @default(now())
+  hospital User @relation(fields: [hospitalUserId], references: [id])
   insuranceRequests InsuranceRequest[]
 }
 

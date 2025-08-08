@@ -22,7 +22,7 @@ export class PaginationDto {
     @ApiPropertyOptional({ example: 'name' })
     @IsOptional()
     @IsString()
-    sortBy?: string;
+    sortBy?: string = 'createdAt';
 
     @ApiPropertyOptional({ example: 'last-uuid' })
     @IsOptional()
