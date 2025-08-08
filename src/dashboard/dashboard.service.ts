@@ -11,23 +11,16 @@ export class DashboardService {
     const { fromDate, toDate } = filter;
 
     // Find all patients and claims created by this hospital
-    const claimWhere: Prisma.InsuranceRequestWhereInput= {}
-    // const claimWhere: any = {
-    //   patient: {
-    //     // patients who belong to this hospital user
-    //     documents: {
-    //       some: {
-    //         uploaderId: hospitalUserId,
-    //       },
-    //     },
-    //   },
-    // };
-
-    claimWhere.createdAt = {
-      gte: new Date(fromDate),
-      lte: new Date(toDate),
-    };
-
+    const claimWhere: Prisma.InsuranceRequestWhereInput= {
+      patient: {
+        hospitalUserId
+      },
+      createdAt: {
+        gte: new Date(fromDate),
+        lte: new Date(toDate),
+      }
+    }
+  
     // 1. Total claims, active claims and total Patients
     const [totalClaims, activeClaims, totalPatients ] = await Promise.all([
       this.prisma.insuranceRequest.count({ where: claimWhere }),
@@ -45,8 +38,10 @@ export class DashboardService {
       }),
       this.prisma.patient.count({
         where: {
-          insuranceRequests: {
-            some: claimWhere,
+          hospitalUserId,
+          createdAt: {
+            gte: new Date(fromDate),
+            lte: new Date(toDate),
           },
         },
       })

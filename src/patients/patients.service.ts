@@ -1,24 +1,40 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ClaimStatus, Patient, Prisma, Role } from '@prisma/client';
+import { CreatePatientDto } from './dto/create-patient.dto';
 
 @Injectable()
 export class PatientsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: Prisma.PatientCreateInput): Promise<Patient> {
-    return await this.prisma.patient.create({ data });
+  async create(
+    data: CreatePatientDto,
+    hospitalUserId: string
+  ): Promise<Patient> {
+    return await this.prisma.patient.create({ 
+      data: {
+        ...data,
+        hospital: { connect: { id: hospitalUserId }}
+      }
+   });
   }
 
-  async findDropdown(nameFilter?: string): Promise<{ id: string; name: string }[]> {
+  async findDropdown(
+    hospitalUserId: string,
+    nameFilter?: string
+  ): Promise<{ id: string; name: string }[]> {
     return this.prisma.patient.findMany({
-      where: nameFilter ? {
-        name: { contains: nameFilter, mode: 'insensitive' }
-      } : undefined,
+      where: {
+        hospitalUserId,
+        ...(nameFilter && {
+          name: { contains: nameFilter, mode: 'insensitive' },
+        }),
+      },
       select: {
         id: true,
         name: true
       },
+      orderBy: { createdAt: 'desc' },
       take: 20,
     });
   }
@@ -57,9 +73,12 @@ export class PatientsService {
     return { total, data }
   }
 
-  async findOne(id: string) : Promise<Patient>{
+  async findOne(where: { 
+    id: string; 
+    hospitalUserId: string 
+  }) : Promise<Patient>{
     return await this.prisma.patient.findUniqueOrThrow({ 
-      where: { id } 
+      where
     });
   }
 
@@ -74,9 +93,12 @@ export class PatientsService {
     })
   }
 
-  async remove(id: string): Promise<Patient>{
+  async remove(where: { 
+    id: string; 
+    hospitalUserId: string 
+  }): Promise<Patient>{
     return await this.prisma.patient.delete({
-      where: { id }
+      where
     })
   }
 }

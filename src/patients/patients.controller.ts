@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { Patient, Prisma } from '@prisma/client';
 import { FindAllPatientDto } from './dto/find-all-patient.dto';
-import { ApiBearerAuth, ApiBody, ApiExtraModels, ApiOperation, ApiProperty, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Patients')
 @ApiBearerAuth('access_token')
@@ -18,25 +18,38 @@ export class PatientsController {
   @Post()
   @ApiOperation({ summary: 'Create a patient' })
   @ApiResponse({ status: 201, description: 'Patient created successfully' })
-  create(@Body() createPatientDto: CreatePatientDto): Promise<Patient> {
-    return this.patientsService.create(createPatientDto);
+  create(
+    @Request() req,
+    @Body() createPatientDto: CreatePatientDto
+  ): Promise<Patient> {
+    const hospitalUserId = req.user.userId;
+    return this.patientsService.create(createPatientDto, hospitalUserId);
   }
 
   @Get('dropdown')
   @ApiOperation({ summary: 'Dropdown list of patients (id & name)' })
   @ApiQuery({ name: 'search', required: false, example: 'john' })
-  findDropdown(@Query('search') search?: string): Promise<{ id: string; name: string }[]> {
-    return this.patientsService.findDropdown(search);
+  findDropdown(
+    @Request() req,
+    @Query('search') search?: string
+  ): Promise<{ id: string; name: string }[]> {
+    const hospitalUserId = req.user.userId;
+    return this.patientsService.findDropdown(hospitalUserId, search);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get paginated list of patients' })
-  findAll(@Query() query: FindAllPatientDto) {
+  findAll(
+    @Request() req,
+    @Query() query: FindAllPatientDto
+  ) {
     const { skip, take, sortBy, sortOrder, name, age } = query;
+    const hospitalUserId = req.user.userId;
 
     const where: Prisma.PatientWhereInput = {};
     if (name) where.name = { contains: name, mode: 'insensitive' };
     if (age) where.age = Number(age);
+    where.hospitalUserId = hospitalUserId
 
     const orderBy = sortBy ? { [sortBy]: sortOrder } : undefined;
 
@@ -45,22 +58,35 @@ export class PatientsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a patient by ID' })
-  findOne(@Param('id') id: string): Promise<Patient> {
-    return this.patientsService.findOne(id);
+  findOne(
+    @Request() req,
+    @Param('id') id: string
+  ): Promise<Patient> {
+    const hospitalUserId = req.user.userId;
+    return this.patientsService.findOne({ id, hospitalUserId });
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a patient by ID, Refer CreatePatientDto; all fields are optional here.' })
-  update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto): Promise<Patient> {
+  update(
+    @Request() req,
+    @Param('id') id: string, 
+    @Body() updatePatientDto: UpdatePatientDto
+  ): Promise<Patient> {
+    const hospitalUserId = req.user.userId;
     return this.patientsService.update({
-      where: { id },
+      where: { id, hospitalUserId },
       data: updatePatientDto
     });
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a patient by ID' })
-  remove(@Param('id') id: string): Promise<Patient> {
-    return this.patientsService.remove(id);
+  remove(
+    @Request() req,
+    @Param('id') id: string
+  ): Promise<Patient> {
+    const hospitalUserId = req.user.userId;
+    return this.patientsService.remove({ id, hospitalUserId });
   }
 }

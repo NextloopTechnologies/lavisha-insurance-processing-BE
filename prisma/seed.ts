@@ -57,10 +57,13 @@ async function main() {
         where: { email: HOSPITAL_EMAIL },
         update: {},
         create: {
-        email: HOSPITAL_EMAIL,
-        password: HOSPITAL_PASSWORD, 
-        name: 'Hospital',
-        role: Role.HOSPITAL,
+            email: HOSPITAL_EMAIL,
+            password: HOSPITAL_PASSWORD, 
+            name: 'Larisha Hospital',
+            hospitalName: "Larisha Hospital",
+            address: "141, Uptown Hill, Santancruz MH",
+            rateListFileName: "hospitals/sample.pdf",
+            role: Role.HOSPITAL,
         },
     });
 
@@ -70,8 +73,7 @@ async function main() {
         data: {
             name: 'John Doe',
             age: 35,
-            url: '',
-            fileName: ''
+            hospital: { connect: { id: hospital.id }}
         },
     });
 
