@@ -45,14 +45,20 @@ export class UsersService {
     async findDropdown(
         where?: Prisma.UserWhereInput
     ): Promise<DropdownUsersResponseDto[]> {
-        return this.prisma.user.findMany({
+        const data = await this.prisma.user.findMany({
             where,
             select: {
                 id: true,
-                name: true
+                name: true,
+                role: true
             },
+            orderBy: { createdAt: 'desc' },
             take: 20,
         });
+        const result = data
+            .filter(value => value.role !== Role.SUPER_ADMIN)
+      
+        return result
     }
 
     async findAll(params: {
