@@ -26,11 +26,11 @@ export class DashboardController {
       case Role.SUPER_ADMIN:
         return "this is super admin dashboard"
       case Role.ADMIN:
-        return "this admin dashboard"
+        return this.dashboardService.adminDashboard(query)
       case Role.HOSPITAL_MANAGER: 
-        return this.dashboardService.getHospitalDashboard(userId, query)
+        return this.dashboardService.hospitalDashboard(userId, query)
       case Role.HOSPITAL: 
-        return this.dashboardService.getHospitalDashboard(userId, query)
+        return this.dashboardService.hospitalDashboard(userId, query)
       default:
         throw new ForbiddenException("Roles not allowed")
     }
