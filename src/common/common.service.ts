@@ -21,11 +21,13 @@ export class CommonService {
         });
     }
 
-    async logInsuranceRequestChange(
+    async logInsuranceRequestChange(params:{
         userId: string,
+        assignedTo?: string,
         insuranceRequestId: string,
         message: string
-    ) {
+    }) {
+        const { userId, assignedTo, insuranceRequestId, message } = params
         const [comment, notification, activityLog] = await this.prisma.$transaction([
             this.prisma.comment.create({
                 data: {
@@ -37,7 +39,7 @@ export class CommonService {
             }),
             this.prisma.notification.create({
                 data: {
-                    userId,
+                    userId: assignedTo,
                     message,
                 },
             }),
@@ -52,6 +54,33 @@ export class CommonService {
         ]);
     
         return { comment, notification, activityLog };
+    }
+
+    async logInsuranceRequestNotification(params:{
+        userId: string,
+        assignedTo?: string,
+        insuranceRequestId: string,
+        message: string
+    }) {
+        const { userId, assignedTo, insuranceRequestId, message } = params
+        const [notification, activityLog] = await this.prisma.$transaction([
+            this.prisma.notification.create({
+                data: {
+                    userId: assignedTo,
+                    message,
+                },
+            }),
+            this.prisma.activityLog.create({
+                data: {
+                    userId,
+                    action: message,
+                    targetType: 'InsuranceRequest',
+                    targetId: insuranceRequestId,
+                },
+            }),
+        ]);
+    
+        return { notification, activityLog };
     }
 
 }
