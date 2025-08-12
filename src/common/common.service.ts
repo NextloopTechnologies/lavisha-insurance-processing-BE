@@ -23,12 +23,12 @@ export class CommonService {
 
     async logInsuranceRequestChange(params:{
         userId: string,
-        assignedTo?: string,
+        notifiedTo: string,
         insuranceRequestId: string,
         message: string
     }) {
-        const { userId, assignedTo, insuranceRequestId, message } = params
-        const [comment, notification, activityLog] = await this.prisma.$transaction([
+        const { userId, notifiedTo, insuranceRequestId, message } = params
+        const [comment, activityLog] = await this.prisma.$transaction([
             this.prisma.comment.create({
                 data: {
                     text: message,
@@ -37,12 +37,6 @@ export class CommonService {
                     creator: { connect: { id: userId }}
                 },
             }),
-            this.prisma.notification.create({
-                data: {
-                    userId: assignedTo,
-                    message,
-                },
-            }),
             this.prisma.activityLog.create({
                 data: {
                     userId,
@@ -52,33 +46,38 @@ export class CommonService {
                 },
             }),
         ]);
+
+        const notification = await this.prisma.notification.create({
+            data: {
+                user: { connect: { id: notifiedTo }},
+                message,
+            },
+        })
     
         return { comment, notification, activityLog };
     }
 
     async logInsuranceRequestNotification(params:{
         userId: string,
-        assignedTo?: string,
+        notifiedTo: string,
         insuranceRequestId: string,
         message: string
     }) {
-        const { userId, assignedTo, insuranceRequestId, message } = params
-        const [notification, activityLog] = await this.prisma.$transaction([
-            this.prisma.notification.create({
-                data: {
-                    userId: assignedTo,
-                    message,
-                },
-            }),
-            this.prisma.activityLog.create({
-                data: {
-                    userId,
-                    action: message,
-                    targetType: 'InsuranceRequest',
-                    targetId: insuranceRequestId,
-                },
-            }),
-        ]);
+        const { userId, notifiedTo, insuranceRequestId, message } = params
+
+        const notification = await this.prisma.notification.create({
+            data: {
+                userId: notifiedTo,
+                message,
+            },
+        })
+
+        const activityLog = await this.logActivity(
+            userId,
+            message,
+            'InsuranceRequest',
+            insuranceRequestId   
+        )
     
         return { notification, activityLog };
     }
