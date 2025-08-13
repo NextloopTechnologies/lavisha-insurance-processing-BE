@@ -21,24 +21,20 @@ export class CommonService {
         });
     }
 
-    async logInsuranceRequestChange(
+    async logInsuranceRequestChange(params:{
         userId: string,
+        notifiedTo: string,
         insuranceRequestId: string,
         message: string
-    ) {
-        const [comment, notification, activityLog] = await this.prisma.$transaction([
+    }) {
+        const { userId, notifiedTo, insuranceRequestId, message } = params
+        const [comment, activityLog] = await this.prisma.$transaction([
             this.prisma.comment.create({
                 data: {
                     text: message,
                     type: 'SYSTEM',
                     insuranceRequest: { connect: { id: insuranceRequestId }}, 
                     creator: { connect: { id: userId }}
-                },
-            }),
-            this.prisma.notification.create({
-                data: {
-                    userId,
-                    message,
                 },
             }),
             this.prisma.activityLog.create({
@@ -50,8 +46,40 @@ export class CommonService {
                 },
             }),
         ]);
+
+        const notification = await this.prisma.notification.create({
+            data: {
+                user: { connect: { id: notifiedTo }},
+                message,
+            },
+        })
     
         return { comment, notification, activityLog };
+    }
+
+    async logInsuranceRequestNotification(params:{
+        userId: string,
+        notifiedTo: string,
+        insuranceRequestId: string,
+        message: string
+    }) {
+        const { userId, notifiedTo, insuranceRequestId, message } = params
+
+        const notification = await this.prisma.notification.create({
+            data: {
+                userId: notifiedTo,
+                message,
+            },
+        })
+
+        const activityLog = await this.logActivity(
+            userId,
+            message,
+            'InsuranceRequest',
+            insuranceRequestId   
+        )
+    
+        return { notification, activityLog };
     }
 
 }

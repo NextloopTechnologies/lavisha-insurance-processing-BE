@@ -2,11 +2,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Document, InsuranceRequest, Prisma } from '@prisma/client';
+import { Document, InsuranceRequest, Prisma, Role } from '@prisma/client';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { DocumentResponseDto, MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
 import { FileService } from 'src/file/file.service';
 import { CommonService } from 'src/common/common.service';
+import { AddAssigneeInsuranceRequestDto } from './dto/assign-insurance-requests.dto';
 
 @Injectable()
 export class InsuranceRequestsService {
@@ -34,6 +35,14 @@ export class InsuranceRequestsService {
     userName: string
   ): Promise<MutateResponseInsuranceRequestDto> {
     const { patientId, assignedTo, documents, ...rest } = data;
+    
+    // notification to superadmin or default larisha admin  along with activity
+    const isSuperAdminExists = await this.prisma.user.findFirst({ 
+      where: { role: Role.SUPER_ADMIN },
+      select: { id: true }
+    })
+    if (!isSuperAdminExists) throw new BadRequestException("No SuperAdmin found!")
+
     const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) throw new BadRequestException('Invalid patient ID');
 
@@ -42,7 +51,7 @@ export class InsuranceRequestsService {
     const createdClaim = await this.prisma.insuranceRequest.create({ 
       data : { 
         ...rest,
-        ...(assignedTo && { user: { connect: { id: assignedTo } } }),
+        // ...(assignedTo && { user: { connect: { id: assignedTo } } }),
         patient: { connect: { id: patientId }}, 
         refNumber 
       },
@@ -53,12 +62,13 @@ export class InsuranceRequestsService {
 
     if(!createdClaim) throw new BadRequestException("Failed to create claim!")
 
-    await this.commonService.logActivity(
-      uploadedBy,
-      `${userName} created claim ${refNumber}`,
-      "InsuranceRequest",
-      createdClaim.id,
-    );
+    // notify to super admin
+    await this.commonService.logInsuranceRequestNotification({
+      userId: uploadedBy,
+      notifiedTo: isSuperAdminExists.id,
+      insuranceRequestId: createdClaim.id,
+      message: `${userName} created claim ${refNumber}`
+    })
   
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
@@ -72,11 +82,12 @@ export class InsuranceRequestsService {
 
     if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
 
-    await this.commonService.logInsuranceRequestChange(
-      uploadedBy,
-      createdClaim.id,
-      `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
-    );
+    await this.commonService.logInsuranceRequestChange({
+      userId: uploadedBy,
+      notifiedTo: isSuperAdminExists.id,
+      insuranceRequestId: createdClaim.id,
+      message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
+    });
   
     return {
       id: createdClaim.id,
@@ -186,6 +197,38 @@ export class InsuranceRequestsService {
       }
       return insuranceRequest;
     }
+
+    async assignClaim(params: {
+      where: Prisma.InsuranceRequestWhereUniqueInput,
+      data: AddAssigneeInsuranceRequestDto,
+      userId: string,
+      userName: string
+    }): Promise<Partial<InsuranceRequest>> {
+      const { where, data, userId, userName } = params
+      const { assignedTo: assigneeId } = data
+
+      const result = await this.prisma.insuranceRequest.update({
+        where,
+        data: {
+          user: { connect: { id: assigneeId }}
+        },
+        select: { id: true, refNumber: true, assignedTo: true, user: { select: { id: true, name: true }} }
+      })
+      if(result) { 
+        await this.commonService.logInsuranceRequestNotification({
+          userId, 
+          notifiedTo: assigneeId,
+          insuranceRequestId: result.id,
+          message: `${userName} has assigned ${result.refNumber} to ${result.user.name}.`
+        })
+      }
+      const { id, refNumber, assignedTo } = result
+      return { 
+        id,
+        refNumber,
+        assignedTo
+      }
+    }
     
     async update(params: {
       where: Prisma.InsuranceRequestWhereUniqueInput,
@@ -198,20 +241,29 @@ export class InsuranceRequestsService {
       const { patientId, assignedTo, documents, ...rest } = data;
       let updatedDocuments: DocumentResponseDto[] = []
       let createdDocuments: DocumentResponseDto[] = []
+      let assigneeId: string;
+
+      const claimExists = await this.prisma.insuranceRequest.findUnique({ 
+        where ,
+        select: { id: true, assignedTo: true, status: true } 
+      })
+      if(!claimExists) throw new BadRequestException('Invalid claim ID');
+      if(!claimExists.assignedTo) throw new BadRequestException('Assign User first!');
+      assigneeId = claimExists.assignedTo
 
       if (patientId) {
-        const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
+        const patient = await this.prisma.patient.findUnique({
+          where: { id: patientId }, 
+          select: { id: true } 
+        });
         if (!patient) throw new BadRequestException('Invalid patient ID');
       }
-
-      const claimExists = await this.prisma.insuranceRequest.findUnique({ where })
-      if( !claimExists) throw new BadRequestException('Invalid claim ID');
 
       const updatedClaim = await this.prisma.insuranceRequest.update({
         where,
         data: {
           ...rest,
-          ...(assignedTo && { user: { connect: { id: assignedTo } } }),
+          // ...(assignedTo && { user: { connect: { id: assignedTo } } }),
           ...(patientId && { patient: { connect: { id: patientId } } })
         },
         include: {
@@ -229,11 +281,12 @@ export class InsuranceRequestsService {
       );
 
       if(data.status && claimExists.status !== data.status){
-        await this.commonService.logInsuranceRequestChange(
-          uploadedBy,
-          claimExists.id,
-          `${userName} updated status from ${claimExists.status} to ${data.status} for ${claimExists.refNumber}`,
-        );
+        await this.commonService.logInsuranceRequestChange({
+          userId: uploadedBy,
+          notifiedTo: assigneeId,
+          insuranceRequestId: claimExists.id,
+          message: `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`,
+        });
       }
 
       if(documents?.length){
@@ -253,11 +306,12 @@ export class InsuranceRequestsService {
       
           if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
           
-          await this.commonService.logInsuranceRequestChange(
-            uploadedBy,
-            claimExists.id,
-            `${userName} added ${createdDocuments.length} document(s) for ${claimExists.refNumber}`,
-          );
+          await this.commonService.logInsuranceRequestChange({
+            userId: uploadedBy,
+            notifiedTo: assigneeId,
+            insuranceRequestId: updatedClaim.id,
+            message:`${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`,
+          });
         }
 
         if(existingDocs?.length){
@@ -280,11 +334,12 @@ export class InsuranceRequestsService {
           );
           if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
 
-          await this.commonService.logInsuranceRequestChange(
-            uploadedBy,
-            claimExists.id,
-            `${userName} updated ${updatedDocuments.length} document(s) for ${claimExists.refNumber}`,
-          );
+          await this.commonService.logInsuranceRequestChange({
+            userId: uploadedBy,
+            notifiedTo: assigneeId,
+            insuranceRequestId: updatedClaim.id,
+            message:`${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`,
+          });
         }
       }
 
