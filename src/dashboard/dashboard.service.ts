@@ -1,13 +1,121 @@
 import { Injectable } from '@nestjs/common';
-import { ClaimStatus, Prisma } from '@prisma/client';
+import { ClaimStatus, Prisma, Role } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FilterDashboardDto } from './dto/filter-dashboard.dto';
+import { percent, subtractMonths } from 'src/common/utils/general.utils';
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getHospitalDashboard(hospitalUserId: string, filter: FilterDashboardDto) {
+  async adminDashboard(
+    filter: FilterDashboardDto
+  ) {
+    const { fromDate, toDate, hospitalUserId } = filter
+
+    const claimWhere: Prisma.InsuranceRequestWhereInput= {
+      ...(hospitalUserId ? { patient: { hospitalUserId } }: undefined),
+      createdAt: {
+        gte: new Date(fromDate),
+        lte: new Date(toDate),
+      }
+    }
+
+    const [monthlyClaims, totalSettlements, totalPatients ] = await Promise.all([
+      this.prisma.insuranceRequest.count({ where: claimWhere }),
+      this.prisma.insuranceRequest.count({
+        where: {
+          ...claimWhere,
+          status: ClaimStatus.SETTLED
+        },
+      }),
+      this.prisma.patient.count({
+        where: {
+          ...(hospitalUserId ? { hospitalUserId } : undefined),
+          createdAt: {
+            gte: new Date(fromDate),
+            lte: new Date(toDate),
+          },
+        },
+      })
+    ])
+
+     // 4. Status-based % counts
+    const [settledCount, enhancementCount, pendingCount] = await Promise.all([
+      this.prisma.insuranceRequest.count({
+        where: {
+          ...claimWhere,
+          status: ClaimStatus.SETTLED,
+        },
+      }),
+      this.prisma.insuranceRequest.count({
+        where: {
+          ...claimWhere,
+          status: ClaimStatus.ENHANCEMENT,
+        },
+      }),
+      this.prisma.insuranceRequest.count({
+        where: {
+          ...claimWhere,
+          status: ClaimStatus.PENDING,
+        },
+      }),
+    ]);
+
+    const [threeMonths, sixMonths, nineMonths, oneYear] = await Promise.all([
+      await this.prisma.user.count({
+        where: { 
+          role: Role.HOSPITAL,
+          createdAt: {
+            gte: subtractMonths(toDate, 3),
+            lte: new Date(toDate) 
+          } 
+        }
+      }),
+      await this.prisma.user.count({
+        where: { role: Role.HOSPITAL,
+          createdAt: {
+            gte: subtractMonths(toDate, 6),
+            lte: new Date(toDate) 
+          }  
+        }
+      }),
+      await this.prisma.user.count({
+        where: { role: Role.HOSPITAL,
+          createdAt: {
+            gte: subtractMonths(toDate, 9),
+            lte: new Date(toDate) 
+          }  
+        }
+      }),
+      await this.prisma.user.count({
+        where: { role: Role.HOSPITAL,
+          createdAt: {
+            gte: subtractMonths(toDate, 12),
+            lte: new Date(toDate) 
+          }  
+        }
+      }) 
+    ])
+    
+    return {
+      monthlyClaims,
+      totalSettlements,
+      totalPatients,
+      percentageSettled: percent(monthlyClaims, settledCount),
+      percentageEnhancement: percent(monthlyClaims, enhancementCount),
+      percentagePending: percent(monthlyClaims, pendingCount),
+      threeMonths,
+      sixMonths,
+      nineMonths,
+      oneYear
+    }
+  }
+
+  async hospitalDashboard(
+    hospitalUserId: string, 
+    filter: FilterDashboardDto
+  ) {
     const { fromDate, toDate } = filter;
 
     // Find all patients and claims created by this hospital
@@ -69,9 +177,6 @@ export class DashboardService {
       }),
     ]);
 
-    const percent = (count: number) =>
-      totalClaims > 0 ? ((count / totalClaims) * 100).toFixed(2) : '0.00';
-
     const claimsByTPA = await this.prisma.insuranceRequest.groupBy({
       by: ['tpaName'],
       where: claimWhere,
@@ -113,9 +218,9 @@ export class DashboardService {
       activeClaims,
       totalPatients,
       averageSettlementPercentage,
-      percentageSettled: percent(settledCount),
-      percentageEnhancement: percent(enhancementCount),
-      percentagePending: percent(pendingCount),
+      percentageSettled: percent(totalClaims, settledCount),
+      percentageEnhancement: percent(totalClaims, enhancementCount),
+      percentagePending: percent(totalClaims, pendingCount),
       totalClaims,
       claimsByTPA: claimsByTPA.map((t) => ({ name: t.tpaName, count: t._count._all })),
       claimsByInsuranceCompany: claimsByInsurance.map((i) => ({
