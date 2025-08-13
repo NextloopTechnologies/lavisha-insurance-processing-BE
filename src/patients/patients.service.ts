@@ -97,6 +97,8 @@ export class PatientsService {
     id: string; 
     hospitalUserId: string 
   }): Promise<Patient>{
+    const claimsCount = await this.prisma.insuranceRequest.count({ where: { patientId: where.id } });
+    if (claimsCount>0) throw new Error("Cannot delete patient with existing claims");
     return await this.prisma.patient.delete({
       where
     })

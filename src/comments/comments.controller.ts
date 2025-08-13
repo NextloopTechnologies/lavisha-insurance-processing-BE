@@ -25,20 +25,19 @@ export class CommentsController {
 
   @Get()
   @ApiOperation({ summary: 'Find all comments (with filters & pagination)' })
-  @ApiQuery({ name: 'type', enum: CommentType, required: false })
-  @ApiQuery({ name: 'insuranceRequestId', required: false })
-  @ApiQuery({ name: 'createdBy', required: false })
-  @ApiQuery({ name: 'role', enum: Role, required: true })
-  @ApiQuery({ name: 'take', required: false, type: Number })
-  @ApiQuery({ name: 'cursor', required: false })
   @ApiResponse({ status: 200, description: 'List of filtered comments.' })
   @ApiResponse({ status: 400, description: 'Invalid query parameters.' })
-  findAll(@Query() query: FindAllCommentsDto): Promise<Comment[]> {
+  findAll(
+    @Request() req,
+    @Query() query: FindAllCommentsDto
+  ): Promise<Comment[]> {
+    const { role } = req.user
     const {
       take, cursor, type, 
-      insuranceRequestId, createdBy, role
+      insuranceRequestId, createdBy,
+      hospitalId
     } = query;
-
+    // let commentType = type ?? undefined
     const allowedTypes: Record<Role, CommentType[]> = {
       SUPER_ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE','SYSTEM'],
       ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
@@ -46,13 +45,25 @@ export class CommentsController {
       HOSPITAL: ['NOTE','QUERY', 'TPA_REPLY','SYSTEM'],
     };
 
+    // if(commentType===CommentType.HOSPITAL_NOTE && role===Role.HOSPITAL) {
+    //   commentType= undefined
+    // }
+
     const where: Prisma.CommentWhereInput = {
       ...(type && { type }),
       ...(insuranceRequestId && { insuranceRequestId }),
       ...(createdBy && { createdBy }),
+      ...((hospitalId && role !== Role.HOSPITAL) && { hospitalId }) ,
       type: { in: allowedTypes[role] },
     };
 
     return this.commentsService.findAll({ take, cursor, where });
+  }
+
+  @Get('/list_manager_comments')
+  @ApiOperation({ summary: 'Get all active chats' })
+  @ApiResponse({ status: 200, description: 'List of chats' })
+  listHospitalsWithManagerComments() {
+    return this.commentsService.listHospitalsWithManagerComments()
   }
 }

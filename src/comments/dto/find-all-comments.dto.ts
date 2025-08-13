@@ -9,17 +9,28 @@ export class FindAllCommentsDto extends PaginationDto {
   @IsEnum(CommentType)
   type?: CommentType;
 
-  @ApiPropertyOptional({ example: 'insuranceRequest-uuid' })
+  @ApiPropertyOptional({ 
+    example: 'insuranceRequest-uuid',
+    description: "Required for claim level comments list" 
+  })
   @IsOptional()
   @IsString()
   insuranceRequestId?: string;
+
+  @ApiPropertyOptional({ 
+    example: 'hospital-uuid',
+    description: "Required for manager level comments list" 
+  })
+  @IsOptional()
+  @IsString()
+  hospitalId?: string;
 
   @ApiPropertyOptional({ example: 'user-uuid' })
   @IsOptional()
   @IsString()
   createdBy?: string;
 
-  @ApiProperty({ enum: Role })
+  @ApiPropertyOptional({ enum: Role })
   @IsEnum(Role)
-  role: Role;
+  role?: Role;
 }

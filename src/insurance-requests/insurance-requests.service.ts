@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Document, InsuranceRequest, Prisma, Role } from '@prisma/client';
+import { ClaimStatus, Document, InsuranceRequest, Prisma, Role } from '@prisma/client';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { DocumentResponseDto, MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
 import { FileService } from 'src/file/file.service';
@@ -354,8 +354,10 @@ export class InsuranceRequestsService {
     }
   
     async remove(refNumber: string): Promise<InsuranceRequest>{
-      return await this.prisma.insuranceRequest.delete({
-        where: { refNumber }
+      const result = await this.prisma.insuranceRequest.delete({
+        where: { refNumber, status: ClaimStatus.DRAFT }
       })
+      if(!result) throw new BadRequestException("Record not found OR it was not a DRAFT status claim")
+      return result
     }
 }
