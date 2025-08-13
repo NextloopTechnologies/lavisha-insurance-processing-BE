@@ -15,8 +15,13 @@ export class NotificationsService {
     orderBy?: Prisma.NotificationOrderByWithRelationInput;
   }): Promise<PaginatedResult<ResponseNotificationDto>> {
     const { skip, take, where, orderBy } = params;
-    const [total, data] = await this.prisma.$transaction([
-      this.prisma.notification.count({ where }),
+    const [totalUnRead, data] = await this.prisma.$transaction([
+      this.prisma.notification.count({ 
+        where: {
+          userId: where.userId,
+          isRead: false 
+        } 
+      }),
       this.prisma.notification.findMany({
         skip,
           take,
@@ -31,7 +36,7 @@ export class NotificationsService {
           }
       })
     ])
-    return { total, data }
+    return { total: totalUnRead,  data }
   }
 
   async update(params: {
