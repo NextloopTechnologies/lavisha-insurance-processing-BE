@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { CommentsService } from './comments.service';
 import { CreateCommentsDto } from './dto/create-comments.dto';
 import { Comment, CommentType, Prisma, Role } from '@prisma/client';
@@ -19,8 +19,8 @@ export class CommentsController {
   @ApiResponse({ status: 201, description: 'Comment created successfully.' })
   @ApiResponse({ status: 400, description: 'Bad Request' })
   create(@Request() req, @Body() data: CreateCommentsDto): Promise<Comment> {
-    const createdBy = req.user.userId;
-    return this.commentsService.create(data, createdBy)
+    const { userId:createdBy, role } = req.user;
+    return this.commentsService.create(role, data, createdBy)
   }
 
   @Get()
@@ -31,13 +31,12 @@ export class CommentsController {
     @Request() req,
     @Query() query: FindAllCommentsDto
   ): Promise<Comment[]> {
-    const { role } = req.user
+    const { userId:currentUserId, role, hospitalId:loggedInUserHospitalId } = req.user
     const {
       take, cursor, type, 
       insuranceRequestId, createdBy,
       hospitalId
     } = query;
-    // let commentType = type ?? undefined
     const allowedTypes: Record<Role, CommentType[]> = {
       SUPER_ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE','SYSTEM'],
       ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
@@ -45,19 +44,27 @@ export class CommentsController {
       HOSPITAL: ['NOTE','QUERY', 'TPA_REPLY','SYSTEM'],
     };
 
-    // if(commentType===CommentType.HOSPITAL_NOTE && role===Role.HOSPITAL) {
-    //   commentType= undefined
-    // }
+    if(hospitalId && role===Role.HOSPITAL) throw new BadRequestException(`Permission Denied for ${role}`)
 
     const where: Prisma.CommentWhereInput = {
-      ...(type && { type }),
       ...(insuranceRequestId && { insuranceRequestId }),
       ...(createdBy && { createdBy }),
       ...((hospitalId && role !== Role.HOSPITAL) && { hospitalId }) ,
       type: { in: allowedTypes[role] },
     };
 
-    return this.commentsService.findAll({ take, cursor, where });
+    return this.commentsService.findAll({ take, cursor, where, currentUserId, role, loggedInUserHospitalId });
+  }
+
+  @Patch('mark-read/:hospitalId')
+  @ApiOperation({ summary: 'Mark all unread comments from a hospital as read' })
+  markRead(
+    @Param('hospitalId') hospitalId: string,
+    @Request() req
+  ) {
+    if(!hospitalId) throw new BadRequestException("hospitalId is required in query!");
+    const { userId: currentUserId } = req.user;
+    return this.commentsService.markRead(hospitalId, currentUserId);
   }
 
   @Get('/list_manager_comments')
@@ -66,4 +73,5 @@ export class CommentsController {
   listHospitalsWithManagerComments() {
     return this.commentsService.listHospitalsWithManagerComments()
   }
+
 }

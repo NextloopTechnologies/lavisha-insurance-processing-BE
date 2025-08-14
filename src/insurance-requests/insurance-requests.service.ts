@@ -353,11 +353,11 @@ export class InsuranceRequestsService {
       };
     }
   
-    async remove(refNumber: string): Promise<InsuranceRequest>{
-      const result = await this.prisma.insuranceRequest.delete({
+    async remove(refNumber: string): Promise<Number>{
+      const result = await this.prisma.insuranceRequest.deleteMany({
         where: { refNumber, status: ClaimStatus.DRAFT }
       })
-      if(!result) throw new BadRequestException("Record not found OR it was not a DRAFT status claim")
-      return result
+      if(result.count === 0) throw new BadRequestException("Record not found OR it was not a DRAFT status claim")
+      return result.count
     }
 }

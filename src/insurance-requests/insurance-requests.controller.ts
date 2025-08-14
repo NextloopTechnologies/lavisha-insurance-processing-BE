@@ -125,8 +125,7 @@ export class InsuranceRequestsController {
   @ApiOperation({ summary: 'Delete insurance request by ref number' })
   @ApiParam({ name: 'refNumber', example: 'CLM-00001' })
   remove(@Param('refNumber') refNumber: string) {
-    // return this.insuranceRequestsService.remove(refNumber);
-    return "This is remove claim"
+    return this.insuranceRequestsService.remove(refNumber);
   }
 }
  

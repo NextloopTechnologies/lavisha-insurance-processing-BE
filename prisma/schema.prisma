@@ -167,6 +167,7 @@ model Comment {
   insuranceRequestId String?
   hospitalId  String?
   fileUrl     String?
+  isRead      Boolean  @default(false)
   createdBy   String?
   createdAt   DateTime @default(now())
   hospital    User?  @relation("HospitalComments", fields: [hospitalId], references: [id])

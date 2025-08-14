@@ -38,7 +38,7 @@ export class CreateCommentsDto {
     @ApiProperty({ 
         example: 'hospital-uuid', 
         required: false,
-        description: 'Required if type is HOSPITAL_NOTE'
+        description: 'Required for manager level comments'
     })
     @ValidateIf(o => o.type === CommentType.HOSPITAL_NOTE)
     @IsString({ message: 'hospitalId must be provided if type is HOSPITAL_NOTE' })

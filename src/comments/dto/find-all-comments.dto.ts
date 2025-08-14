@@ -31,6 +31,7 @@ export class FindAllCommentsDto extends PaginationDto {
   createdBy?: string;
 
   @ApiPropertyOptional({ enum: Role })
+  @IsOptional()
   @IsEnum(Role)
   role?: Role;
 }

@@ -6,6 +6,8 @@ import { PaginatedResult } from 'src/common/interfaces/paginated-result.interfac
 import { MutateUserResponseDto } from './dto/mutate-users-response.dto';
 import { FileService } from 'src/file/file.service';
 import { DropdownUsersResponseDto } from './dto/dropdown-users.dto';
+import { CreateUserDto } from './dto/create-users.dto';
+import { UpdateUserDto } from './dto/update-users.dto';
 
 @Injectable()
 export class UsersService {
@@ -15,8 +17,9 @@ export class UsersService {
     ){}
 
     async create(
-        data: Prisma.UserCreateInput
+        data: CreateUserDto
     ): Promise<MutateUserResponseDto> {
+        const { hospitalId, rateListFileName, ...rest } = data
         const existingUser = await this.prisma.user.findUnique({
             where: { email: data.email.toLowerCase() },
         });
@@ -25,9 +28,11 @@ export class UsersService {
         const hashedPassword = await bcrypt.hash(data.password, 10);
         return await this.prisma.user.create({
             data: {
-                ...data,
+                ...rest,
                 email: data.email.toLowerCase(),
                 password: hashedPassword,
+                ...(hospitalId && { hospital: { connect: { id: hospitalId }}}),
+                ...((data.role===Role.HOSPITAL && rateListFileName) && { rateListFileName })
             },
             select: {
                 id: true,
@@ -37,6 +42,7 @@ export class UsersService {
                 hospitalName: true,
                 rateListFileName: true,
                 rateListUrl: true,
+                hospital: { select: { id: true, name: true }},
                 role: true,
             }
         });
@@ -81,6 +87,7 @@ export class UsersService {
                     email: true,
                     address: true,
                     hospitalName: true,
+                    hospital: { select: { id: true, name: true }},
                     role: true,
                 }
             })
@@ -103,6 +110,7 @@ export class UsersService {
                 profileUrl: true,
                 rateListFileName: true,
                 rateListUrl: true,
+                hospital: { select: { id: true, name: true }},
                 role: true,
             }
         })
@@ -118,12 +126,15 @@ export class UsersService {
 
     async update(params: {
         where: Prisma.UserWhereUniqueInput,
-        data: Prisma.UserUpdateInput
+        data: UpdateUserDto
     }): Promise<MutateUserResponseDto> {
         const { where, data } = params;
-        const { email, password, ...rest } = data
+        const { email, password, hospitalId, ...rest } = data
         return this.prisma.user.update({ 
-            data: { ...rest }, 
+            data: { 
+                ...rest,
+                ...(hospitalId && { hospital: { connect: { id: hospitalId }}})
+            }, 
             where,
             select: {
                 id: true,
@@ -133,6 +144,7 @@ export class UsersService {
                 hospitalName: true,
                 rateListFileName: true,
                 rateListUrl: true,
+                hospital: { select: { id: true, name: true }},
                 role: true,
             }
         })
