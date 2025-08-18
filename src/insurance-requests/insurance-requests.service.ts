@@ -56,11 +56,12 @@ export class InsuranceRequestsService {
         refNumber 
       },
       include: { 
-        patient: { select: { id: true, name: true }}
+        patient: { select: { id: true, name: true, hospital: { select: { id: true }} }}
       }
     });
 
     if(!createdClaim) throw new BadRequestException("Failed to create claim!")
+    const patientHospitalId = createdClaim.patient.hospital.id
 
     // notify to super admin
     await this.commonService.logInsuranceRequestNotification({
@@ -86,6 +87,7 @@ export class InsuranceRequestsService {
       userId: uploadedBy,
       notifiedTo: isSuperAdminExists.id,
       insuranceRequestId: createdClaim.id,
+      hospitalId: patientHospitalId,
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
     });
   
@@ -267,11 +269,12 @@ export class InsuranceRequestsService {
           ...(patientId && { patient: { connect: { id: patientId } } })
         },
         include: {
-          patient: { select: { id: true, name: true }},
+          patient: { select: { id: true, name: true, hospital: { select: { id: true }}}},
         },
       });
 
       if(!updatedClaim) throw new BadRequestException("Failed to update claim!")
+      const patientHospitalId = updatedClaim.patient.hospital.id
 
       await this.commonService.logActivity(
         uploadedBy,
@@ -285,6 +288,7 @@ export class InsuranceRequestsService {
           userId: uploadedBy,
           notifiedTo: assigneeId,
           insuranceRequestId: claimExists.id,
+          hospitalId: patientHospitalId,
           message: `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`,
         });
       }
@@ -310,6 +314,7 @@ export class InsuranceRequestsService {
             userId: uploadedBy,
             notifiedTo: assigneeId,
             insuranceRequestId: updatedClaim.id,
+            hospitalId: patientHospitalId,
             message:`${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`,
           });
         }
@@ -338,6 +343,7 @@ export class InsuranceRequestsService {
             userId: uploadedBy,
             notifiedTo: assigneeId,
             insuranceRequestId: updatedClaim.id,
+            hospitalId: patientHospitalId,
             message:`${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`,
           });
         }

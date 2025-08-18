@@ -19,8 +19,8 @@ export class CommentsController {
   @ApiResponse({ status: 201, description: 'Comment created successfully.' })
   @ApiResponse({ status: 400, description: 'Bad Request' })
   create(@Request() req, @Body() data: CreateCommentsDto): Promise<Comment> {
-    const { userId:createdBy, role } = req.user;
-    return this.commentsService.create(role, data, createdBy)
+    const { userId:createdBy, role, hospitalId:loggedInUserHospitalId } = req.user;
+    return this.commentsService.create(role, data, createdBy, loggedInUserHospitalId)
   }
 
   @Get()
@@ -37,40 +37,66 @@ export class CommentsController {
       insuranceRequestId, createdBy,
       hospitalId
     } = query;
-    const allowedTypes: Record<Role, CommentType[]> = {
-      SUPER_ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE','SYSTEM'],
-      ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
-      HOSPITAL_MANAGER: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
-      HOSPITAL: ['NOTE','QUERY', 'TPA_REPLY','SYSTEM'],
-    };
-
-    if(hospitalId && role===Role.HOSPITAL) throw new BadRequestException(`Permission Denied for ${role}`)
+    let hospitalIdForWhereClause:string
+    const isHospitalIdInQuery = hospitalId ? true : false
+    // const allowedTypes: Record<Role, CommentType[]> = {
+    //   SUPER_ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE','SYSTEM'],
+    //   ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
+    //   HOSPITAL_MANAGER: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
+    //   HOSPITAL: ['NOTE','QUERY', 'TPA_REPLY','SYSTEM'],
+    // };
+    // assign hospitalId wise filter
+    if(role === Role.HOSPITAL) hospitalIdForWhereClause = currentUserId
+    else if (role === Role.HOSPITAL_MANAGER) {
+      if(!loggedInUserHospitalId) throw new BadRequestException(`Assign Hospital first for role ${role}`)
+      hospitalIdForWhereClause = loggedInUserHospitalId
+    }
+    else if(role===Role.ADMIN||role===Role.SUPER_ADMIN) hospitalIdForWhereClause = hospitalId
+    
+    if(role===Role.HOSPITAL){
+      if(!insuranceRequestId) {
+        throw new BadRequestException(`insuranceRequestId/claim uuid is required in query param for Role ${role}`)
+      }
+      if(hospitalId) {
+        throw new BadRequestException(`Role ${role} can only access claim comments`)
+      }
+    }
 
     const where: Prisma.CommentWhereInput = {
       ...(insuranceRequestId && { insuranceRequestId }),
       ...(createdBy && { createdBy }),
-      ...((hospitalId && role !== Role.HOSPITAL) && { hospitalId }) ,
-      type: { in: allowedTypes[role] },
+      ...(hospitalIdForWhereClause && { hospitalId: hospitalIdForWhereClause }) ,
+      ...(isHospitalIdInQuery && { type: CommentType.HOSPITAL_NOTE })
+      // type: { in: allowedTypes[role] },
     };
 
-    return this.commentsService.findAll({ take, cursor, where, currentUserId, role, loggedInUserHospitalId });
+    return this.commentsService.findAll({ 
+      take, cursor, where, 
+      currentUserId, role, 
+      loggedInUserHospitalId
+    });
   }
 
-  @Patch('mark-read/:hospitalId')
+  @Patch('markRead/:hospitalId')
   @ApiOperation({ summary: 'Mark all unread comments from a hospital as read' })
   markRead(
     @Param('hospitalId') hospitalId: string,
     @Request() req
   ) {
+    const { userId: currentUserId, role } = req.user;
+    // only admin and superadmin can mark
+    if(role===Role.HOSPITAL||role===Role.HOSPITAL_MANAGER) throw new BadRequestException(`Role ${role} not allowed!`)
     if(!hospitalId) throw new BadRequestException("hospitalId is required in query!");
-    const { userId: currentUserId } = req.user;
     return this.commentsService.markRead(hospitalId, currentUserId);
   }
 
   @Get('/list_manager_comments')
   @ApiOperation({ summary: 'Get all active chats' })
   @ApiResponse({ status: 200, description: 'List of chats' })
-  listHospitalsWithManagerComments() {
+  listHospitalsWithManagerComments(@Request() req) {
+    const { role } = req.user;
+    // only admin and superadmin can mark
+    if(role===Role.HOSPITAL||role===Role.HOSPITAL_MANAGER) throw new BadRequestException(`Role ${role} not allowed!`)
     return this.commentsService.listHospitalsWithManagerComments()
   }
 

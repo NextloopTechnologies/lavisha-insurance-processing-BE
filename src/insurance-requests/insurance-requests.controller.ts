@@ -37,11 +37,15 @@ export class InsuranceRequestsController {
     @Request() req,
     @Query() query: FindAllInsuranceRequestDto
   ): Promise<PaginatedResult<InsuranceRequest>> {
-    const { userId:hospitalUserId, role } = req.user
+    const { userId, role, hospitalId } = req.user
     const { skip, take, sortBy, sortOrder, 
       refNumber, doctorName, insuranceCompany, tpaName, assigneeName,
       patientName, status, createdFrom, createdTo
     } = query;
+    let hospitalUserId:string
+
+    if(role===Role.HOSPITAL) hospitalUserId = userId
+    else if(role===Role.HOSPITAL_MANAGER) hospitalUserId = hospitalId
 
     const where: Prisma.InsuranceRequestWhereInput = {};
     if(![Role.SUPER_ADMIN, Role.ADMIN].includes(role)) where.patient = { hospitalUserId }

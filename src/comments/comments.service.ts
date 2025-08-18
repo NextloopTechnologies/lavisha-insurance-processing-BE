@@ -10,13 +10,26 @@ export class CommentsService {
      async create(
         role: string,
         data: CreateCommentsDto, 
-        createdBy: string
+        createdBy: string,
+        loggedInUserHospitalId: string
     ): Promise<Comment> {
-        const { insuranceRequestId, hospitalId, ...rest } = data;
+        const { insuranceRequestId, hospitalId: payloadHospitalId, ...rest } = data;
+        let hospitalIdForCreateQuery: string
+
+        if(role === Role.SUPER_ADMIN || role === Role.ADMIN) {
+            if(!payloadHospitalId) throw new BadRequestException("Hospital Id is required")
+            hospitalIdForCreateQuery = payloadHospitalId
+        }
+        else if(role === Role.HOSPITAL) hospitalIdForCreateQuery = createdBy
+        else if (role === Role.HOSPITAL_MANAGER) {
+            if(!loggedInUserHospitalId) throw new BadRequestException(`Assign Hospital first for role ${role}`)
+            hospitalIdForCreateQuery = loggedInUserHospitalId
+        }
+
         if(role === Role.HOSPITAL && data.type===CommentType.HOSPITAL_NOTE) {
             throw new BadRequestException(`Role ${role} can't post manager comments`)
         }
-        if(insuranceRequestId && hospitalId) {
+        if(insuranceRequestId && payloadHospitalId) {
             throw new BadRequestException("insuranceRequestId and hospitalId both can't be used at same time.")
         }
         if(rest.type === CommentType.NOTE || 
@@ -30,8 +43,8 @@ export class CommentsService {
        
         return await this.prisma.comment.create({ 
           data : { 
+            hospital: { connect: { id: hospitalIdForCreateQuery }}, 
             ...rest, 
-            ...(hospitalId ? { hospital: { connect: { id: hospitalId }}} : undefined), 
             ...(insuranceRequestId ? { insuranceRequest: { connect: { id: insuranceRequestId }}} : undefined), 
             ...(insuranceRequestId && { isRead: true }),
             creator: { connect: { id: createdBy }} 
@@ -47,8 +60,12 @@ export class CommentsService {
         role: Role,
         loggedInUserHospitalId: string
     }): Promise<Comment[]> {
-        const { cursor, take, where, currentUserId, role, loggedInUserHospitalId } = params;
-        const comments = this.prisma.comment.findMany({
+        const { 
+            cursor, take, where, 
+            currentUserId, role, 
+            loggedInUserHospitalId,
+        } = params;
+        const comments = await this.prisma.comment.findMany({
             take,
             ...(cursor && { cursor: { id: cursor }, skip: 1 }),
             where,
@@ -57,7 +74,7 @@ export class CommentsService {
                 creator: { select: { id: true, name: true, profileUrl: true } },
             },
         })
-        if (role === Role.HOSPITAL_MANAGER && loggedInUserHospitalId) {
+        if(role === Role.HOSPITAL_MANAGER && loggedInUserHospitalId) {
             await this.prisma.comment.updateMany({
                 where: {
                     hospitalId: loggedInUserHospitalId,
@@ -72,6 +89,12 @@ export class CommentsService {
     }
 
     async markRead(hospitalId: string, currentUserId: string) {
+        const hospital = await this.prisma.user.findFirst({
+            where: { id: hospitalId, role: Role.HOSPITAL },
+            select: { id: true }
+        })
+        if(!hospital) throw new BadRequestException("Invalid HospitalID!")
+        
         return await this.prisma.comment.updateMany({
             where: {
                 hospitalId,
@@ -87,7 +110,14 @@ export class CommentsService {
         const latestComments: Comment[] = await this.prisma.$queryRaw`
             SELECT DISTINCT ON ("hospitalId") c."id", c."text", c."type", c."hospitalId", c."createdAt",
                     h."name" as "hospitalName",
-                    u."name" as "creatorName"
+                    u."name" as "creatorName",
+                    (
+                        SELECT COUNT(*) 
+                        FROM "Comment" c2
+                        WHERE c2."hospitalId" = c."hospitalId" 
+                            AND c2."type" = 'HOSPITAL_NOTE'
+                            AND c2."isRead" = false
+                    )::int AS "unreadCount"
             FROM "Comment" c
             LEFT JOIN "User" h ON h."id" = c."hospitalId"
             LEFT JOIN "User" u ON u."id" = c."createdBy"
