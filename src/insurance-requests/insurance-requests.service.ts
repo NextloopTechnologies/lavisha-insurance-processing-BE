@@ -359,11 +359,17 @@ export class InsuranceRequestsService {
       };
     }
   
-    async remove(refNumber: string): Promise<Number>{
-      const result = await this.prisma.insuranceRequest.deleteMany({
-        where: { refNumber, status: ClaimStatus.DRAFT }
+    async remove(refNumber: string): Promise<InsuranceRequest>{
+      const result = await this.prisma.insuranceRequest.delete({
+        where: { refNumber, status: ClaimStatus.DRAFT },
+        include: { 
+          documents: { select: { fileName: true }}
+        }
       })
-      if(result.count === 0) throw new BadRequestException("Record not found OR it was not a DRAFT status claim")
-      return result.count
+      if(result.documents?.length>0) {
+        const documentsToBeDeleted = result.documents.map(doc => doc.fileName)
+        await this.fileService.deleteMultipleFiles(documentsToBeDeleted)
+      }
+      return result
     }
 }
