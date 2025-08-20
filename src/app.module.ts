@@ -14,6 +14,10 @@ import { DocumentsModule } from './documents/documents.module';
 import { EnhancementsModule } from './enhancements/enhancements.module';
 import { QueriesModule } from './queries/queries.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from './auth/roles/roles.guard';
+import { PermissionsGuard } from './auth/permissions/permissions.guard';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -32,6 +36,20 @@ import { NotificationsModule } from './notifications/notifications.module';
     NotificationsModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard
+    }
+  ],
 })
 export class AppModule {}
