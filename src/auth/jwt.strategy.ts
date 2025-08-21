@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -27,7 +28,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || !token || !user.tokens.includes(token)) {
       throw new UnauthorizedException('Token is not recognized or has expired');
     }   
-  
-    return { userId: payload.sub, email: payload.email, name: user.name, role: payload.role };
+
+    const result: any = {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
+    if (user.role === Role.HOSPITAL_MANAGER) {
+      result.hospitalId = user.hospitalId;
+    }
+    
+    return result;
   }
 }

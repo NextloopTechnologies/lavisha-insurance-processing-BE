@@ -37,11 +37,18 @@ model User {
   tokens String[] @default([])
   createdAt DateTime @default(now()) 
   updatedAt DateTime @updatedAt 
+
+  // Self relation: Managers belong to a hospital
+  hospitalId          String?   
+  hospital            User?     @relation("HospitalManagers", fields: [hospitalId], references: [id], onDelete: Cascade)
+  managers            User[]    @relation("HospitalManagers")
+
   documents Document[]
   comments Comment[]
   notifications Notification[]
   insuranceRequests InsuranceRequest[]
   patients Patient[]
+  commentsForHospital Comment[] @relation("HospitalComments")
 } 
 
 model Patient {
@@ -52,7 +59,7 @@ model Patient {
   fileName      String?
   hospitalUserId String?
   createdAt     DateTime @default(now())
-  hospital User? @relation(fields: [hospitalUserId], references: [id])
+  hospital User? @relation(fields: [hospitalUserId], references: [id], onDelete: SetNull)
   insuranceRequests InsuranceRequest[]
 }
 
@@ -62,15 +69,15 @@ model Document {
   fileName    String
   type        DocumentType
   remark      String?
-  uploadedBy  String
-  insuranceRequestId String
+  uploadedBy  String?
+  insuranceRequestId String?
   enhancementId String?
   queryId String?
   uploadedAt  DateTime @default(now())
-  uploader    User    @relation(fields: [uploadedBy], references: [id])
-  insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
-  enhancement Enhancement? @relation(fields: [enhancementId], references: [id])
-  query Query? @relation(fields: [queryId], references: [id])
+  uploader    User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id], onDelete: SetNull)
+  enhancement Enhancement? @relation(fields: [enhancementId], references: [id], onDelete: SetNull)
+  query Query? @relation(fields: [queryId], references: [id], onDelete: SetNull)
 }
 
 enum DocumentType {
@@ -110,7 +117,7 @@ model InsuranceRequest {
   comments    Comment[]
   documents   Document[]
   queries     Query[]
-  user     User?  @relation(fields: [assignedTo], references: [id])
+  assignee     User?  @relation(fields: [assignedTo], references: [id])
   patient     Patient  @relation(fields: [patientId], references: [id])
 }
 
@@ -158,10 +165,13 @@ model Comment {
   text        String
   type        CommentType
   insuranceRequestId String?
+  hospitalId  String?
   fileUrl     String?
-  createdBy   String
+  isRead      Boolean  @default(false)
+  createdBy   String?
   createdAt   DateTime @default(now())
-  creator    User    @relation(fields: [createdBy], references: [id])
+  hospital    User?  @relation("HospitalComments", fields: [hospitalId], references: [id], onDelete: SetNull)
+  creator    User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
   insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
 }
 
@@ -179,7 +189,7 @@ model Notification {
   message    String
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ActivityLog {

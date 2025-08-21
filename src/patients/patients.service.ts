@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ClaimStatus, Patient, Prisma, Role } from '@prisma/client';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { FileService } from 'src/file/file.service';
 
 @Injectable()
 export class PatientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+     private fileService: FileService
+  ) {}
 
   async create(
     data: CreatePatientDto,
@@ -97,8 +101,15 @@ export class PatientsService {
     id: string; 
     hospitalUserId: string 
   }): Promise<Patient>{
-    return await this.prisma.patient.delete({
+    const claimsCount = await this.prisma.insuranceRequest.count({ 
+      where: { patientId: where.id } 
+    });
+    if (claimsCount>0) throw new BadRequestException("Cannot delete patient with existing claims");
+    
+    const result = await this.prisma.patient.delete({
       where
     })
+    if(result.fileName) await this.fileService.deleteFile(result.fileName)
+    return result
   }
 }
