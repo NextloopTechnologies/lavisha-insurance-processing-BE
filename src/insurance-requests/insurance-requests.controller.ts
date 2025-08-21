@@ -9,15 +9,17 @@ import { PaginatedResult } from 'src/common/interfaces/paginated-result.interfac
 import { MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AddAssigneeInsuranceRequestDto } from './dto/assign-insurance-requests.dto';
+import { Permissions } from 'src/auth/permissions/permissions.decorator';
+import { Permission } from 'src/auth/permissions/permissions.enum';
 
 @Controller('claims')
 @ApiTags('Claims')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access_token')
 export class InsuranceRequestsController {
   constructor(private readonly insuranceRequestsService: InsuranceRequestsService) {}
 
   @Post()
+  @Permissions(Permission.CLAIM_CREATE)
   @ApiOperation({ summary: 'Create an insurance request' })
   @ApiBody({ type: CreateInsuranceRequestDto })
   @ApiResponse({ status: 201, type: MutateResponseInsuranceRequestDto })
@@ -25,12 +27,18 @@ export class InsuranceRequestsController {
     @Request() req,
     @Body() createInsuranceRequestDto: CreateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
-    const uploadedBy = req.user.userId;
-    const userName = req.user.name;
+    let uploadedBy:string
+    // const uploadedBy = req.user.userId;
+    // const userName = req.user.name;
+    const { userId, name:userName, role, hospitalId } = req.user
+    if(role===Role.HOSPITAL) uploadedBy = userId
+    else if(role===Role.HOSPITAL_MANAGER) uploadedBy = hospitalId
+
     return this.insuranceRequestsService.create(createInsuranceRequestDto, uploadedBy, userName);
   }
 
   @Get()
+  @Permissions(Permission.CLAIM_LIST)
   @ApiOperation({ summary: 'Get all insurance requests (paginated)' })
   @ApiResponse({ status: 200, description: 'Paginated list of insurance requests' })
   findAll(
@@ -66,6 +74,7 @@ export class InsuranceRequestsController {
   
 
   @Get(':refNumber')
+  @Permissions(Permission.CLAIM_READ)
   @ApiOperation({ summary: 'Get one insurance request by ref number' })
   @ApiParam({ name: 'refNumber', example: 'CLM-00001' })
   @ApiResponse({ status: 200, description: 'Insurance request detail' })
@@ -73,7 +82,12 @@ export class InsuranceRequestsController {
     @Request() req,
     @Param('refNumber') refNumber: string
   ): Promise<InsuranceRequest | null> {
-    const { userId:hospitalUserId, role } = req.user
+    // const { userId:hospitalUserId, role } = req.user
+    const { userId, role, hospitalId } = req.user
+    let hospitalUserId:string
+
+    if(role===Role.HOSPITAL) hospitalUserId = userId
+    else if(role===Role.HOSPITAL_MANAGER) hospitalUserId = hospitalId
 
     return this.insuranceRequestsService.findOne({
       refNumber,
@@ -82,6 +96,7 @@ export class InsuranceRequestsController {
   }
 
   @Patch('assign/:refNumber')
+  @Permissions(Permission.CLAIM_ASSIGN)
   @ApiOperation({ summary: 'Assign claim by ref number and assignee id' })
   @ApiResponse({ status: 200 })
   assignClaim(
@@ -89,8 +104,8 @@ export class InsuranceRequestsController {
     @Param('refNumber') refNumber: string, 
     @Body() addAssigneeInsuranceRequestDto: AddAssigneeInsuranceRequestDto
   ): Promise<Partial<InsuranceRequest>>| string{
-    const { userId, role, name:userName } = req.user;
-    if(![Role.SUPER_ADMIN, Role.ADMIN].includes(role)) return "Permission Denied!"
+    const { userId, name:userName } = req.user;
+    // if(![Role.SUPER_ADMIN, Role.ADMIN].includes(role)) return "Permission Denied!"
     return this.insuranceRequestsService.assignClaim({
       where: { 
         refNumber
@@ -102,6 +117,7 @@ export class InsuranceRequestsController {
   }
 
   @Patch(':refNumber')
+  @Permissions(Permission.CLAIM_UPDATE)
   @ApiOperation({ summary: 'Update insurance request by ref number, consider Create schema with all fields as optional.' })
   @ApiResponse({ status: 200, type: MutateResponseInsuranceRequestDto })
   update(
@@ -109,7 +125,13 @@ export class InsuranceRequestsController {
     @Param('refNumber') refNumber: string, 
     @Body() updateInsuranceRequestDto: UpdateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
-    const { userId: uploadedBy, name: userName, role } = req.user;
+    // const { userId: uploadedBy, name: userName, role } = req.user;
+     const { userId, name: userName, role, hospitalId } = req.user
+    let uploadedBy:string
+
+    if(role===Role.HOSPITAL) uploadedBy = userId
+    else if(role===Role.HOSPITAL_MANAGER) uploadedBy = hospitalId
+
     return this.insuranceRequestsService.update({
       where: { 
         refNumber,
@@ -122,6 +144,7 @@ export class InsuranceRequestsController {
   }
 
   @Delete(':refNumber')
+  @Permissions(Permission.CLAIM_DELETE_DRAFT)
   @ApiOperation({ summary: 'Delete insurance request by ref number' })
   @ApiParam({ name: 'refNumber', example: 'CLM-00001' })
   remove(@Param('refNumber') refNumber: string) {

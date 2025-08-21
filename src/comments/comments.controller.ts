@@ -5,15 +5,18 @@ import { Comment, CommentType, Prisma, Role } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { FindAllCommentsDto } from './dto/find-all-comments.dto';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Permissions } from 'src/auth/permissions/permissions.decorator';
+import { Permission } from 'src/auth/permissions/permissions.enum';
 
 @ApiTags("Comments")
 @Controller('comments')
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access_token')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @Post()
+  @Permissions(Permission.COMMENT_CREATE)
   @ApiOperation({ summary: 'Create a comment' })
   @ApiBody({ type: CreateCommentsDto })
   @ApiResponse({ status: 201, description: 'Comment created successfully.' })
@@ -24,6 +27,7 @@ export class CommentsController {
   }
 
   @Get()
+  @Permissions(Permission.COMMENT_LIST)
   @ApiOperation({ summary: 'Find all comments (with filters & pagination)' })
   @ApiQuery({ name: 'type', enum: CommentType, required: false })
   @ApiQuery({ name: 'insuranceRequestId', required: false })

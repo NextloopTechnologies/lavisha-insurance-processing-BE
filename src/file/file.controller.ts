@@ -6,15 +6,18 @@ import { DeleteFilesDto } from './dto/delete-files.dto';
 import { S3FileUploadResult, S3FileUploadResultDto } from 'src/common/interfaces/s3.interface';
 import { DeleteObjectsCommandOutput } from '@aws-sdk/client-s3';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Permissions } from 'src/auth/permissions/permissions.decorator';
+import { Permission } from 'src/auth/permissions/permissions.enum';
 
 @ApiTags('File')
 @Controller('file')
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access_token')
 export class FileController {
     constructor(private readonly fileService: FileService) {}
 
     @Post('upload')
+    @Permissions(Permission.FILE_SINGLE_UPLOAD)
     @UseInterceptors(FileInterceptor('file'))
     @ApiOperation({ summary: 'Upload a single file' })
     @ApiConsumes('multipart/form-data')
@@ -50,6 +53,7 @@ export class FileController {
     }
 
     @Post('bulkUpload')
+     @Permissions(Permission.FILE_BULK_UPLOAD)
     @UseInterceptors(FilesInterceptor('files', 7))
     @ApiOperation({ summary: 'Upload multiple files (max 6)' })
     @ApiConsumes('multipart/form-data')
