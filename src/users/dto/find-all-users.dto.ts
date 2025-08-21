@@ -1,5 +1,5 @@
 import { Role } from "@prisma/client";
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEnum, IsIn, IsOptional, IsString } from "class-validator";
 import { PaginationDto } from "common/dto/pagination.dto"
 
 export class FindAllUserDto extends PaginationDto {
@@ -13,5 +13,10 @@ export class FindAllUserDto extends PaginationDto {
 
     @IsOptional()
     @IsEnum(Role)
+    @IsIn([
+        Role.ADMIN,
+        Role.HOSPITAL,
+        Role.HOSPITAL_MANAGER,
+    ], { message: 'SUPERADMIN cannot be created manually' })
     role?: Role;
 }
