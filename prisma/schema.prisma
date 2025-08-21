@@ -40,7 +40,7 @@ model User {
 
   // Self relation: Managers belong to a hospital
   hospitalId          String?   
-  hospital            User?     @relation("HospitalManagers", fields: [hospitalId], references: [id])
+  hospital            User?     @relation("HospitalManagers", fields: [hospitalId], references: [id], onDelete: Cascade)
   managers            User[]    @relation("HospitalManagers")
 
   documents Document[]
@@ -59,7 +59,7 @@ model Patient {
   fileName      String?
   hospitalUserId String?
   createdAt     DateTime @default(now())
-  hospital User? @relation(fields: [hospitalUserId], references: [id])
+  hospital User? @relation(fields: [hospitalUserId], references: [id], onDelete: SetNull)
   insuranceRequests InsuranceRequest[]
 }
 
@@ -117,7 +117,7 @@ model InsuranceRequest {
   comments    Comment[]
   documents   Document[]
   queries     Query[]
-  user     User?  @relation(fields: [assignedTo], references: [id])
+  assignee     User?  @relation(fields: [assignedTo], references: [id])
   patient     Patient  @relation(fields: [patientId], references: [id])
 }
 
@@ -170,7 +170,7 @@ model Comment {
   isRead      Boolean  @default(false)
   createdBy   String?
   createdAt   DateTime @default(now())
-  hospital    User?  @relation("HospitalComments", fields: [hospitalId], references: [id])
+  hospital    User?  @relation("HospitalComments", fields: [hospitalId], references: [id], onDelete: SetNull)
   creator    User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
   insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
 }

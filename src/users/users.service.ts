@@ -130,6 +130,13 @@ export class UsersService {
     }): Promise<MutateUserResponseDto> {
         const { where, data } = params;
         const { email, password, hospitalId, ...rest } = data
+         const isSuperAdminUser = await this.prisma.user.findFirst({
+            where: { 
+                id: where.id,
+                role: Role.SUPER_ADMIN
+            }
+        })
+        if(isSuperAdminUser) throw new BadRequestException("SUPERADMIN role can't be modified!")
         return this.prisma.user.update({ 
             data: { 
                 ...rest,
@@ -170,20 +177,33 @@ export class UsersService {
     }
 
     async remove(
-        where: Prisma.UserWhereUniqueInput
+        whereUniqueInput: Prisma.UserWhereUniqueInput
     ): Promise<MutateUserResponseDto>{
-        return this.prisma.user.delete({
-            where,
+        const isUserExists = await this.prisma.user.findFirst({
+            where: whereUniqueInput,
+            select: { id: true, role: true }
+        })
+        if(isUserExists.role===Role.SUPER_ADMIN) throw new BadRequestException("SUPERADMIN role can't be modified!")
+
+        const result =  await this.prisma.user.delete({
+            where: whereUniqueInput,
             select: {
                 id: true,
                 name: true,
                 email: true,
-                address: true,
-                hospitalName: true,
+                profileFileName: true,
                 rateListFileName: true,
-                rateListUrl: true,
                 role: true,
             }
         })
+        const { profileFileName, rateListFileName} = result
+        try {
+            if(profileFileName) await this.fileService.deleteFile(profileFileName)
+            if(rateListFileName) await this.fileService.deleteFile(rateListFileName)
+        } catch (error) {
+            console.error("USER_DELETE_SERVICE_S3: ", error)
+        }
+
+        return result
     }
 }

@@ -116,7 +116,8 @@ export class InsuranceRequestsService {
           where,
           orderBy,
           include: {
-            patient: { select: { id: true, name: true }}
+            patient: { select: { id: true, name: true }},
+            assignee: { select: { id: true, name: true }}
           }
         })
       ])
@@ -139,6 +140,7 @@ export class InsuranceRequestsService {
         where: insuranceRequestWhereUniqueInput,
         include: {
           patient: { select: { id: true, name: true } },
+          assignee: { select: { id: true, name: true }},
           documents: true,
           queries: { include: { documents: true }},
           enhancements: { include: { documents: true }}
@@ -212,16 +214,16 @@ export class InsuranceRequestsService {
       const result = await this.prisma.insuranceRequest.update({
         where,
         data: {
-          user: { connect: { id: assigneeId }}
+          assignee: { connect: { id: assigneeId }}
         },
-        select: { id: true, refNumber: true, assignedTo: true, user: { select: { id: true, name: true }} }
+        select: { id: true, refNumber: true, assignedTo: true, assignee: { select: { id: true, name: true }} }
       })
       if(result) { 
         await this.commonService.logInsuranceRequestNotification({
           userId, 
           notifiedTo: assigneeId,
           insuranceRequestId: result.id,
-          message: `${userName} has assigned ${result.refNumber} to ${result.user.name}.`
+          message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
         })
       }
       const { id, refNumber, assignedTo } = result
@@ -360,16 +362,25 @@ export class InsuranceRequestsService {
     }
   
     async remove(refNumber: string): Promise<InsuranceRequest>{
-      const result = await this.prisma.insuranceRequest.delete({
+      const isStatusClaimDraft = await this.prisma.insuranceRequest.findFirst({
         where: { refNumber, status: ClaimStatus.DRAFT },
-        include: { 
-          documents: { select: { fileName: true }}
-        }
+        select: { id: true, documents: { select: { fileName: true }} }
       })
-      if(result.documents?.length>0) {
-        const documentsToBeDeleted = result.documents.map(doc => doc.fileName)
-        await this.fileService.deleteMultipleFiles(documentsToBeDeleted)
+
+      if(!isStatusClaimDraft) throw new BadRequestException("Claim not found or not a draft claim!")
+
+      const [delDocuments, delInsuranceRequest] =  await this.prisma.$transaction([
+        this.prisma.document.deleteMany({ where: { insuranceRequestId: isStatusClaimDraft.id }}),
+        this.prisma.insuranceRequest.delete({ where: { refNumber } })
+      ])
+      try {
+        if(delDocuments.count>0) {
+          const docsToBeDeletedFromS3 = isStatusClaimDraft.documents.map(doc => doc.fileName)
+          await this.fileService.deleteMultipleFiles(docsToBeDeletedFromS3)
+        }
+      } catch (error) {
+        console.error("FROM_INSURANCE_REQUEST_DELETE_S3: ", error)  
       }
-      return result
+      return delInsuranceRequest
     }
 }

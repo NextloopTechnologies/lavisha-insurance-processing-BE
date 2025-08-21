@@ -53,7 +53,7 @@ export class InsuranceRequestsController {
     if (doctorName) where.doctorName = { contains: doctorName, mode: 'insensitive' };
     if (insuranceCompany) where.insuranceCompany = { contains: insuranceCompany, mode: 'insensitive' };
     if (tpaName) where.tpaName = { contains: tpaName, mode: 'insensitive' };
-    if (assigneeName) where.user = { name: { contains: assigneeName, mode: 'insensitive' }};
+    if (assigneeName) where.assignee = { name: { contains: assigneeName, mode: 'insensitive' }};
     if (patientName) where.patient = { name: { contains: patientName, mode: 'insensitive' }};
     if (status  && status.length > 0) where.status = { in: status };
     if (createdFrom || createdTo) {
