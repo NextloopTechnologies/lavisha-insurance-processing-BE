@@ -27,13 +27,7 @@ export class InsuranceRequestsController {
     @Request() req,
     @Body() createInsuranceRequestDto: CreateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
-    let uploadedBy:string
-    // const uploadedBy = req.user.userId;
-    // const userName = req.user.name;
-    const { userId, name:userName, role, hospitalId } = req.user
-    if(role===Role.HOSPITAL) uploadedBy = userId
-    else if(role===Role.HOSPITAL_MANAGER) uploadedBy = hospitalId
-
+    const { userId: uploadedBy, name: userName } = req.user
     return this.insuranceRequestsService.create(createInsuranceRequestDto, uploadedBy, userName);
   }
 
@@ -86,7 +80,6 @@ export class InsuranceRequestsController {
     @Request() req,
     @Param('refNumber') refNumber: string
   ): Promise<InsuranceRequest | null> {
-    // const { userId:hospitalUserId, role } = req.user
     const { userId, role, hospitalId } = req.user
     let hospitalUserId:string
 
@@ -109,7 +102,7 @@ export class InsuranceRequestsController {
     @Body() addAssigneeInsuranceRequestDto: AddAssigneeInsuranceRequestDto
   ): Promise<Partial<InsuranceRequest>>| string{
     const { userId, name:userName } = req.user;
-    // if(![Role.SUPER_ADMIN, Role.ADMIN].includes(role)) return "Permission Denied!"
+
     return this.insuranceRequestsService.assignClaim({
       where: { 
         refNumber
@@ -129,20 +122,19 @@ export class InsuranceRequestsController {
     @Param('refNumber') refNumber: string, 
     @Body() updateInsuranceRequestDto: UpdateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
-    // const { userId: uploadedBy, name: userName, role } = req.user;
-     const { userId, name: userName, role, hospitalId } = req.user
-    let uploadedBy:string
+    const { userId, name: userName, role, hospitalId } = req.user
+    let filterByHospitalId:string
 
-    if(role===Role.HOSPITAL) uploadedBy = userId
-    else if(role===Role.HOSPITAL_MANAGER) uploadedBy = hospitalId
+    if(role===Role.HOSPITAL) filterByHospitalId = userId
+    else if(role===Role.HOSPITAL_MANAGER) filterByHospitalId = hospitalId
 
     return this.insuranceRequestsService.update({
       where: { 
         refNumber,
-        ...(![Role.SUPER_ADMIN, Role.ADMIN].includes(role) ? { patient: { hospitalUserId: uploadedBy }} : undefined )
+        ...(![Role.SUPER_ADMIN, Role.ADMIN].includes(role) ? { patient: { hospitalUserId: filterByHospitalId }} : undefined )
       }, 
       data: updateInsuranceRequestDto,
-      uploadedBy,
+      uploadedBy: userId,
       userName,
     });
   }

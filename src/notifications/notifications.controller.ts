@@ -1,21 +1,21 @@
-import { Controller, Get, Body, Patch, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Param, Request, Query } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { FindAllNotificationsDto } from './dto/find-all-notification.dto';
 import { Prisma } from '@prisma/client';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { ResponseNotificationDto } from './dto/response-notification.dto';
-import { UpdateNotificationDto } from './dto/update-notification.dto';
+import { Permissions } from 'src/auth/permissions/permissions.decorator';
+import { Permission } from 'src/auth/permissions/permissions.enum';
 
 @Controller('notifications')
 @ApiTags('Notifications')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access_token')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
+  @Permissions(Permission.NOTIFICATION_READ_LIST)
   @ApiOperation({ summary: 'Get paginated list of notifications' })
   @ApiResponse({ status: 200, type: ResponseNotificationDto })
   findAll(
@@ -35,15 +35,16 @@ export class NotificationsController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.NOTIFICATION_MARK_READ)
   @ApiOperation({ summary: 'Update notification by isRead' })
   @ApiResponse({ status: 200, type: ResponseNotificationDto })
   update(
-    @Param('id') id: string, 
-    @Body() updateNotificationDto: UpdateNotificationDto
+    @Param('id') id: string
   ): Promise<ResponseNotificationDto> {
+
     return this.notificationsService.update({
       where: { id },
-      data: updateNotificationDto
+      data: { isRead: true }
     });
   }
 

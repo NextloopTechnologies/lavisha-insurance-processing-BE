@@ -1,7 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Post, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FileService } from './file.service';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { DeleteFilesDto } from './dto/delete-files.dto';
 import { S3FileUploadResult, S3FileUploadResultDto } from 'src/common/interfaces/s3.interface';
 import { DeleteObjectsCommandOutput } from '@aws-sdk/client-s3';
@@ -11,7 +10,6 @@ import { Permission } from 'src/auth/permissions/permissions.enum';
 
 @ApiTags('File')
 @Controller('file')
-// @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access_token')
 export class FileController {
     constructor(private readonly fileService: FileService) {}
@@ -53,7 +51,7 @@ export class FileController {
     }
 
     @Post('bulkUpload')
-     @Permissions(Permission.FILE_BULK_UPLOAD)
+    @Permissions(Permission.FILE_BULK_UPLOAD)
     @UseInterceptors(FilesInterceptor('files', 7))
     @ApiOperation({ summary: 'Upload multiple files (max 6)' })
     @ApiConsumes('multipart/form-data')

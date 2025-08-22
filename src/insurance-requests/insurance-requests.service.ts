@@ -139,7 +139,7 @@ export class InsuranceRequestsService {
       const insuranceRequest = await this.prisma.insuranceRequest.findUniqueOrThrow({
         where: insuranceRequestWhereUniqueInput,
         include: {
-          patient: { select: { id: true, name: true } },
+          patient: { select: { id: true, name: true, hospital: { select: { id: true, name: true }} } },
           assignee: { select: { id: true, name: true }},
           documents: true,
           queries: { include: { documents: true }},
