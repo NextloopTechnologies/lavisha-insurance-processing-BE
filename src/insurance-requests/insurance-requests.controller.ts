@@ -45,11 +45,15 @@ export class InsuranceRequestsController {
     @Request() req,
     @Query() query: FindAllInsuranceRequestDto
   ): Promise<PaginatedResult<InsuranceRequest>> {
-    const { userId:hospitalUserId, role } = req.user
+    const { userId, role, hospitalId } = req.user
     const { skip, take, sortBy, sortOrder, 
       refNumber, doctorName, insuranceCompany, tpaName, assigneeName,
       patientName, status, createdFrom, createdTo
     } = query;
+    let hospitalUserId:string
+
+    if(role===Role.HOSPITAL) hospitalUserId = userId
+    else if(role===Role.HOSPITAL_MANAGER) hospitalUserId = hospitalId
 
     const where: Prisma.InsuranceRequestWhereInput = {};
     if(![Role.SUPER_ADMIN, Role.ADMIN].includes(role)) where.patient = { hospitalUserId }
@@ -57,7 +61,7 @@ export class InsuranceRequestsController {
     if (doctorName) where.doctorName = { contains: doctorName, mode: 'insensitive' };
     if (insuranceCompany) where.insuranceCompany = { contains: insuranceCompany, mode: 'insensitive' };
     if (tpaName) where.tpaName = { contains: tpaName, mode: 'insensitive' };
-    if (assigneeName) where.user = { name: { contains: assigneeName, mode: 'insensitive' }};
+    if (assigneeName) where.assignee = { name: { contains: assigneeName, mode: 'insensitive' }};
     if (patientName) where.patient = { name: { contains: patientName, mode: 'insensitive' }};
     if (status  && status.length > 0) where.status = { in: status };
     if (createdFrom || createdTo) {
@@ -148,8 +152,7 @@ export class InsuranceRequestsController {
   @ApiOperation({ summary: 'Delete insurance request by ref number' })
   @ApiParam({ name: 'refNumber', example: 'CLM-00001' })
   remove(@Param('refNumber') refNumber: string) {
-    // return this.insuranceRequestsService.remove(refNumber);
-    return "This is remove claim"
+    return this.insuranceRequestsService.remove(refNumber);
   }
 }
  

@@ -25,16 +25,19 @@ export class CommonService {
         userId: string,
         notifiedTo: string,
         insuranceRequestId: string,
+        hospitalId: string,
         message: string
     }) {
-        const { userId, notifiedTo, insuranceRequestId, message } = params
+        const { userId, notifiedTo, insuranceRequestId, hospitalId, message } = params
         const [comment, activityLog] = await this.prisma.$transaction([
             this.prisma.comment.create({
                 data: {
                     text: message,
                     type: 'SYSTEM',
                     insuranceRequest: { connect: { id: insuranceRequestId }}, 
-                    creator: { connect: { id: userId }}
+                    hospital: { connect: { id: hospitalId }},
+                    creator: { connect: { id: userId }},
+                    isRead: true
                 },
             }),
             this.prisma.activityLog.create({

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateInsuranceRequestDto } from './dto/create-insurance-request.dto';
 import { UpdateInsuranceRequestDto } from './dto/update-insurance-request.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Document, InsuranceRequest, Prisma, Role } from '@prisma/client';
+import { ClaimStatus, Document, InsuranceRequest, Prisma, Role } from '@prisma/client';
 import { PaginatedResult } from 'src/common/interfaces/paginated-result.interface';
 import { DocumentResponseDto, MutateResponseInsuranceRequestDto } from './dto/mutate-response-insurance-requests.dto';
 import { FileService } from 'src/file/file.service';
@@ -56,11 +56,12 @@ export class InsuranceRequestsService {
         refNumber 
       },
       include: { 
-        patient: { select: { id: true, name: true }}
+        patient: { select: { id: true, name: true, hospital: { select: { id: true }} }}
       }
     });
 
     if(!createdClaim) throw new BadRequestException("Failed to create claim!")
+    const patientHospitalId = createdClaim.patient.hospital.id
 
     // notify to super admin
     await this.commonService.logInsuranceRequestNotification({
@@ -86,6 +87,7 @@ export class InsuranceRequestsService {
       userId: uploadedBy,
       notifiedTo: isSuperAdminExists.id,
       insuranceRequestId: createdClaim.id,
+      hospitalId: patientHospitalId,
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
     });
   
@@ -114,7 +116,8 @@ export class InsuranceRequestsService {
           where,
           orderBy,
           include: {
-            patient: { select: { id: true, name: true }}
+            patient: { select: { id: true, name: true }},
+            assignee: { select: { id: true, name: true }}
           }
         })
       ])
@@ -137,6 +140,7 @@ export class InsuranceRequestsService {
         where: insuranceRequestWhereUniqueInput,
         include: {
           patient: { select: { id: true, name: true } },
+          assignee: { select: { id: true, name: true }},
           documents: true,
           queries: { include: { documents: true }},
           enhancements: { include: { documents: true }}
@@ -210,16 +214,16 @@ export class InsuranceRequestsService {
       const result = await this.prisma.insuranceRequest.update({
         where,
         data: {
-          user: { connect: { id: assigneeId }}
+          assignee: { connect: { id: assigneeId }}
         },
-        select: { id: true, refNumber: true, assignedTo: true, user: { select: { id: true, name: true }} }
+        select: { id: true, refNumber: true, assignedTo: true, assignee: { select: { id: true, name: true }} }
       })
       if(result) { 
         await this.commonService.logInsuranceRequestNotification({
           userId, 
           notifiedTo: assigneeId,
           insuranceRequestId: result.id,
-          message: `${userName} has assigned ${result.refNumber} to ${result.user.name}.`
+          message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
         })
       }
       const { id, refNumber, assignedTo } = result
@@ -267,11 +271,12 @@ export class InsuranceRequestsService {
           ...(patientId && { patient: { connect: { id: patientId } } })
         },
         include: {
-          patient: { select: { id: true, name: true }},
+          patient: { select: { id: true, name: true, hospital: { select: { id: true }}}},
         },
       });
 
       if(!updatedClaim) throw new BadRequestException("Failed to update claim!")
+      const patientHospitalId = updatedClaim.patient.hospital.id
 
       await this.commonService.logActivity(
         uploadedBy,
@@ -285,6 +290,7 @@ export class InsuranceRequestsService {
           userId: uploadedBy,
           notifiedTo: assigneeId,
           insuranceRequestId: claimExists.id,
+          hospitalId: patientHospitalId,
           message: `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`,
         });
       }
@@ -310,6 +316,7 @@ export class InsuranceRequestsService {
             userId: uploadedBy,
             notifiedTo: assigneeId,
             insuranceRequestId: updatedClaim.id,
+            hospitalId: patientHospitalId,
             message:`${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`,
           });
         }
@@ -338,6 +345,7 @@ export class InsuranceRequestsService {
             userId: uploadedBy,
             notifiedTo: assigneeId,
             insuranceRequestId: updatedClaim.id,
+            hospitalId: patientHospitalId,
             message:`${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`,
           });
         }
@@ -354,8 +362,25 @@ export class InsuranceRequestsService {
     }
   
     async remove(refNumber: string): Promise<InsuranceRequest>{
-      return await this.prisma.insuranceRequest.delete({
-        where: { refNumber }
+      const isStatusClaimDraft = await this.prisma.insuranceRequest.findFirst({
+        where: { refNumber, status: ClaimStatus.DRAFT },
+        select: { id: true, documents: { select: { fileName: true }} }
       })
+
+      if(!isStatusClaimDraft) throw new BadRequestException("Claim not found or not a draft claim!")
+
+      const [delDocuments, delInsuranceRequest] =  await this.prisma.$transaction([
+        this.prisma.document.deleteMany({ where: { insuranceRequestId: isStatusClaimDraft.id }}),
+        this.prisma.insuranceRequest.delete({ where: { refNumber } })
+      ])
+      try {
+        if(delDocuments.count>0) {
+          const docsToBeDeletedFromS3 = isStatusClaimDraft.documents.map(doc => doc.fileName)
+          await this.fileService.deleteMultipleFiles(docsToBeDeletedFromS3)
+        }
+      } catch (error) {
+        console.error("FROM_INSURANCE_REQUEST_DELETE_S3: ", error)  
+      }
+      return delInsuranceRequest
     }
 }
