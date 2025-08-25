@@ -20,7 +20,9 @@ export class EnhancementsService {
         uploadedBy: string,
         userName: string
     ): Promise<MutateEnhancementsResponseDto>{
-        const { insuranceRequestId, documents, ...rest } = data;
+        const { insuranceRequestId, documents, status, ...rest } = data;
+        if(status) throw new BadRequestException("No status are allowed on create!")
+
         const claim = await this.prisma.insuranceRequest.findUnique({ where: { id: insuranceRequestId } });
         if (!claim) throw new BadRequestException('Invalid claim ID');
        
@@ -53,7 +55,7 @@ export class EnhancementsService {
             userId: uploadedBy,
             notifiedTo,
             insuranceRequestId,
-            message: `${userName} created enhancement claim for ${refNumber}`
+            message: `${userName} created enhancement for claim ${refNumber}`
         })
 
         const createdDocuments = await this.prisma.document.createManyAndReturn({
@@ -73,7 +75,7 @@ export class EnhancementsService {
             notifiedTo,
             insuranceRequestId,
             hospitalId: patientHospitalId,
-            message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
+            message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`,
         });
     
         return {
@@ -142,7 +144,7 @@ export class EnhancementsService {
                 notifiedTo,
                 insuranceRequestId: updatedEnhancement.insuranceRequest.id,
                 hospitalId: patientHospitalId,
-                message: `${userName} updated status from ${enhancementExists.status} to ${data.status} for ${refNumber}'s enhancment`,
+                message: `${userName} updated status from ${enhancementExists.status} to ${data.status} for ${refNumber}'s enhancement.`,
             });
         }
 
@@ -167,7 +169,7 @@ export class EnhancementsService {
                     notifiedTo,
                     insuranceRequestId: updatedEnhancement.insuranceRequest.id,
                     hospitalId: patientHospitalId,
-                    message:`${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s enhancement`,
+                    message:`${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`,
                 });
             }
 
@@ -195,7 +197,7 @@ export class EnhancementsService {
                     notifiedTo,
                     insuranceRequestId: updatedEnhancement.insuranceRequest.id,
                     hospitalId: patientHospitalId,
-                    message:`${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s enhancement`,
+                    message:`${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s enhancement.`,
                 });
             }
         }

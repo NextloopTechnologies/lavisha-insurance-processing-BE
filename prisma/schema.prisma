@@ -154,6 +154,8 @@ model Query {
   insuranceRequestId String
   enhancementId      String?
   notes              String?
+  resolvedRemarks    String?
+  isResolved         Boolean  @default(false)
   raisedAt           DateTime @default(now())
   documents          Document[] 
   insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
