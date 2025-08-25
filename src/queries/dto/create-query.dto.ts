@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { DocumentType } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
 
 class CreateDocumentInput {
     @ApiPropertyOptional({ example: 'doc-uuid' })
@@ -28,7 +28,10 @@ export class CreateQueryDto {
     @IsString()
     insuranceRequestId: string;
 
-    @ApiPropertyOptional({ example: 'enhancment-uuid' })
+    @ApiPropertyOptional({ 
+        example: 'enhancment-uuid',
+        description: 'required when creating enhancement queries.'
+    })
     @IsOptional()
     @IsString()
     enhancementId?: string;
@@ -37,6 +40,16 @@ export class CreateQueryDto {
     @IsOptional()
     @IsString()
     notes?: string;
+
+    @ApiPropertyOptional({ example: 'Resolved remarks notes...' })
+    @IsOptional()
+    @IsString()
+    resolvedRemarks?: string;
+
+    @ApiPropertyOptional({ example: true })
+    @IsOptional()
+    @IsBoolean()
+    isResolved?: boolean;
 
     @ApiProperty({ type: [CreateDocumentInput] })
     @IsArray()

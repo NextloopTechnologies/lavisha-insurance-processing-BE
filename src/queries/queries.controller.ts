@@ -22,8 +22,8 @@ export class QueriesController {
     @Request() req,
     @Body() createQueryDto: CreateQueryDto
   ): Promise<MutateQueryResponseDto> {
-    const uploadedBy = req.user.userId;
-    return this.queriesService.create(createQueryDto, uploadedBy);
+    const {userId:uploadedBy, name:userName }= req.user;
+    return this.queriesService.create(createQueryDto, uploadedBy, userName);
   }
   
   @Patch(':id')
@@ -35,11 +35,12 @@ export class QueriesController {
     @Param('id') id: string, 
     @Body() updateQueryDto: UpdateQueryDto
   ): Promise<MutateQueryResponseDto> {
-    const uploadedBy = req.user.userId;
+    const {userId:uploadedBy, name:userName }= req.user;
     return this.queriesService.update({
       where: { id }, 
       data: updateQueryDto,
-      uploadedBy
+      uploadedBy,
+      userName
     });
   }
 }
