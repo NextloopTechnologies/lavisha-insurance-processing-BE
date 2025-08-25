@@ -111,6 +111,7 @@ export class CommentsService {
             SELECT DISTINCT ON ("hospitalId") c."id", c."text", c."type", c."hospitalId", c."createdAt",
                     h."name" as "hospitalName",
                     u."name" as "creatorName",
+                    u."profileUrl",
                     (
                         SELECT COUNT(*) 
                         FROM "Comment" c2
