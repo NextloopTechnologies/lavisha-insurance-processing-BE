@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Public } from './decorators/public.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -18,6 +19,7 @@ export class AuthController {
 
     @ApiOperation({ summary: 'Login user and return access token' })
     @ApiResponse({ status: 200, description: 'Login successful' })
+    @Public()
     @Post('login')
     login(@Body() body: LoginDto) {
         return this.authService.login(body.email, body.password)

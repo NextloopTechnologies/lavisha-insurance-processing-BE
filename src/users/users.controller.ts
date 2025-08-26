@@ -1,5 +1,4 @@
-import { Controller, Get, UseGuards, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-users.dto';
@@ -9,15 +8,17 @@ import { PaginatedResult } from 'src/common/interfaces/paginated-result.interfac
 import { FindAllUserDto } from './dto/find-all-users.dto';
 import { MutateUserResponseDto } from './dto/mutate-users-response.dto';
 import { DropdownUsersDto, DropdownUsersResponseDto } from './dto/dropdown-users.dto';
+import { Permissions } from 'src/auth/permissions/permissions.decorator';
+import { Permission } from 'src/auth/permissions/permissions.enum';
 
 @ApiTags('Users')
 @Controller('users')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access_token')
 export class UsersController {
     constructor(private usersService: UsersService) {}
 
     @Post()
+    @Permissions(Permission.USER_CREATE)
     @ApiOperation({ summary: 'Creates a new user' })
     @ApiResponse({ status: 201, type: MutateUserResponseDto })
     register(@Body() body: CreateUserDto):  Promise<MutateUserResponseDto>{
@@ -25,6 +26,7 @@ export class UsersController {
     }
 
     @Get('dropdown')
+    @Permissions(Permission.USER_DROPDOWN_LIST)
     @ApiOperation({ summary: 'Dropdown list of users (id & name)' })
     @ApiResponse({ status: 200, type: DropdownUsersResponseDto })
     findDropdown(@Query() query: DropdownUsersDto ): Promise<DropdownUsersResponseDto[]> {
@@ -38,6 +40,7 @@ export class UsersController {
     }
 
     @Get()
+    @Permissions(Permission.USER_LIST)
     @ApiOperation({ summary: 'Get paginated list of users' })
     findAll(@Query() query: FindAllUserDto): Promise<PaginatedResult<MutateUserResponseDto>> {
         const { skip, take, sortBy, sortOrder, name, email, role } = query;
@@ -53,6 +56,7 @@ export class UsersController {
     }
 
     @Get(':id')
+    @Permissions(Permission.USER_READ)
     @ApiOperation({ summary: 'Get a User by ID' })
     @ApiResponse({ status: 200, type: MutateUserResponseDto })
     findOne(@Param('id') id: string): Promise<MutateUserResponseDto> {
@@ -60,6 +64,7 @@ export class UsersController {
     }
    
     @Patch(':id')
+    @Permissions(Permission.USER_UPDATE)
     @ApiOperation({ summary: 'Update a User by ID, Refer CreateUserDto; all fields are optional here.' })
     @ApiResponse({ status: 200, type: MutateUserResponseDto })
     update(
@@ -87,6 +92,7 @@ export class UsersController {
 
 
     @Delete(':id')
+    @Permissions(Permission.USER_DELETE)
     @ApiOperation({ summary: 'Delete a User by ID' })
     remove(@Param('id') id: string): Promise<MutateUserResponseDto> {
        return this.usersService.remove({ id });
