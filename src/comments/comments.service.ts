@@ -15,7 +15,7 @@ export class CommentsService {
     ): Promise<Comment> {
         const { insuranceRequestId, hospitalId: payloadHospitalId, ...rest } = data;
         let hospitalIdForCreateQuery: string
-
+        // attach hospital id for each comment
         if(role === Role.SUPER_ADMIN || role === Role.ADMIN) {
             if(!payloadHospitalId) throw new BadRequestException("Hospital Id is required")
             hospitalIdForCreateQuery = payloadHospitalId
@@ -25,12 +25,13 @@ export class CommentsService {
             if(!loggedInUserHospitalId) throw new BadRequestException(`Assign Hospital first for role ${role}`)
             hospitalIdForCreateQuery = loggedInUserHospitalId
         }
-
-        if(role === Role.HOSPITAL && data.type===CommentType.HOSPITAL_NOTE) {
+        // restrict role HOSPITAL to create manager comments
+        if(role === Role.HOSPITAL && (data.type===CommentType.HOSPITAL_NOTE || payloadHospitalId)) {
             throw new BadRequestException(`Role ${role} can't post manager comments`)
         }
-        if(insuranceRequestId && payloadHospitalId) {
-            throw new BadRequestException("insuranceRequestId and hospitalId both can't be used at same time.")
+        // restrict insuranceRequestid with manager comments
+        if(data.type===CommentType.HOSPITAL_NOTE && insuranceRequestId) {
+            throw new BadRequestException(`${data.type} with insuranceRequestId both can't be used at same time.`)
         }
         if(rest.type === CommentType.NOTE || 
         rest.type === CommentType.QUERY || 
