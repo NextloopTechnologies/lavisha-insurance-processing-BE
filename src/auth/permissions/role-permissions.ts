@@ -65,6 +65,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.NOTIFICATION_MARK_READ,
   ],
   HOSPITAL: [
+    Permission.USER_READ,
     Permission.PATIENT_CREATE,
     Permission.PATIENT_READ,
     Permission.PATIENT_LIST,
@@ -89,6 +90,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.NOTIFICATION_MARK_READ,
   ],
   HOSPITAL_MANAGER: [
+    Permission.USER_READ,
     Permission.PATIENT_CREATE,
     Permission.PATIENT_READ,
     Permission.PATIENT_LIST,

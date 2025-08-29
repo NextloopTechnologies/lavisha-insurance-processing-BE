@@ -98,7 +98,7 @@ export class UsersService {
     async findOne(
         userWhereUniqueInput: Prisma.UserWhereUniqueInput,
     ): Promise<MutateUserResponseDto> {
-        const result = await this.prisma.user.findUnique({
+        const result = await this.prisma.user.findUniqueOrThrow({
             where: userWhereUniqueInput,
             select: {
                 id: true,

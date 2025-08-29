@@ -3,7 +3,7 @@ import { CommentType } from "@prisma/client";
 import { IsEnum, IsIn, IsOptional, IsString, ValidateIf } from "class-validator";
 
 export class CreateCommentsDto {
-    @ApiProperty({ example: 'comments-uuid'})
+    @ApiProperty({ example: 'sample comment text...'})
     @IsString()
     text: string;
 
