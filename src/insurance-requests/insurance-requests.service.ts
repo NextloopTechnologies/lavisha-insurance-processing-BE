@@ -63,13 +63,21 @@ export class InsuranceRequestsService {
     if(!createdClaim) throw new BadRequestException("Failed to create claim!")
     const patientHospitalId = createdClaim.patient.hospital.id
 
-    // notify to super admin
-    await this.commonService.logInsuranceRequestNotification({
+    // notify to super admin and hospital user
+    const notificationPayload = {
       userId: uploadedBy,
-      notifiedTo: isSuperAdminExists.id,
+      notifiedTo: uploadedBy,
       insuranceRequestId: createdClaim.id,
       message: `${userName} created claim ${refNumber}`
-    })
+    }
+
+    await Promise.all([
+      await this.commonService.logInsuranceRequestNotification(notificationPayload),
+      await this.commonService.logInsuranceRequestNotification({
+        ...notificationPayload,
+        notifiedTo: isSuperAdminExists.id
+      })
+    ])
   
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
@@ -83,13 +91,24 @@ export class InsuranceRequestsService {
 
     if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
 
-    await this.commonService.logInsuranceRequestChange({
+    // notify and create comment for hospital and superadmin
+    const notifyAndHistoryPayload = {
       userId: uploadedBy,
-      notifiedTo: isSuperAdminExists.id,
+      notifiedTo: uploadedBy,
       insuranceRequestId: createdClaim.id,
-      hospitalId: patientHospitalId,
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
-    });
+    }
+
+    await Promise.all([
+      await this.commonService.logInsuranceRequestChange({
+        ...notifyAndHistoryPayload,
+        hospitalId: patientHospitalId,
+      }),
+      await this.commonService.logInsuranceRequestNotification({
+        ...notifyAndHistoryPayload,
+        notifiedTo: isSuperAdminExists.id
+      })
+    ])
   
     return {
       id: createdClaim.id,
