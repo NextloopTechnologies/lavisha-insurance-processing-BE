@@ -52,12 +52,29 @@ export class QueriesService {
     const notifiedTo = createdQuery.insuranceRequest.assignedTo
     const refNumber = createdQuery.insuranceRequest.refNumber
 
-    await this.commonService.logInsuranceRequestNotification({
-      userId: uploadedBy,
-      notifiedTo,
-      insuranceRequestId,
-      message: `${userName} created ${enhancementId ? 'enhancement query' : 'query'} for claim ${refNumber}`
-    })
+    // notify to assignee and hospital user
+    const notificationPayload = {
+        userId: uploadedBy,
+        insuranceRequestId,
+        message: `${userName} created ${enhancementId ? 'enhancement query' : 'query'} for claim ${refNumber}`
+    }
+
+    await Promise.all([
+        await this.commonService.logInsuranceRequestNotification({
+            ...notificationPayload,
+            notifiedTo,
+        }),
+        await this.commonService.logInsuranceRequestNotification({
+            ...notificationPayload,
+            notifiedTo: patientHospitalId
+        })
+    ])
+    // await this.commonService.logInsuranceRequestNotification({
+    //   userId: uploadedBy,
+    //   notifiedTo,
+    //   insuranceRequestId,
+    //   message: `${userName} created ${enhancementId ? 'enhancement query' : 'query'} for claim ${refNumber}`
+    // })
 
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
@@ -72,13 +89,32 @@ export class QueriesService {
 
     if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
 
-    await this.commonService.logInsuranceRequestChange({
+    // notify and create comment for hospital and assignee
+    const notifyAndHistoryPayload = {
       userId: uploadedBy,
-      notifiedTo,
       insuranceRequestId,
-      hospitalId: patientHospitalId,
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
-    });
+    }
+
+    await Promise.all([
+      await this.commonService.logInsuranceRequestChange({
+        ...notifyAndHistoryPayload,
+        notifiedTo,
+        hospitalId: patientHospitalId,
+      }),
+      await this.commonService.logInsuranceRequestNotification({
+        ...notifyAndHistoryPayload,
+        notifiedTo: patientHospitalId
+      })
+    ])
+
+    // await this.commonService.logInsuranceRequestChange({
+    //   userId: uploadedBy,
+    //   notifiedTo,
+    //   insuranceRequestId,
+    //   hospitalId: patientHospitalId,
+    //   message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
+    // });
 
     return {
       id: createdQuery.id,
@@ -139,14 +175,35 @@ export class QueriesService {
       updatedQuery.id,
     );
 
-    if(data.isResolved){
-      await this.commonService.logInsuranceRequestNotification({
-        userId: uploadedBy,
-        notifiedTo,
-        insuranceRequestId: updatedQuery.insuranceRequest.id,
-        message: `${userName} has marked ${updatedQuery.enhancementId ? 'enhancement query' : 'query'} as resolved for claim ${refNumber}`,
-      });
+    // notify and create comment for hospital and assignee
+    const notifyAndHistoryPayload = {
+      userId: uploadedBy,
+      insuranceRequestId: updatedQuery.insuranceRequest.id
     }
+
+    if(data.isResolved){
+      const message = `${userName} has marked ${updatedQuery.enhancementId ? 'enhancement query' : 'query'} as resolved for claim ${refNumber}`
+      await Promise.all([
+          await this.commonService.logInsuranceRequestNotification({
+              ...notifyAndHistoryPayload,
+              notifiedTo,
+              message
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+              ...notifyAndHistoryPayload,
+              notifiedTo: patientHospitalId,
+              message
+          })
+      ])
+    }
+    // if(data.isResolved){
+    //   await this.commonService.logInsuranceRequestNotification({
+    //     userId: uploadedBy,
+    //     notifiedTo,
+    //     insuranceRequestId: updatedQuery.insuranceRequest.id,
+    //     message: `${userName} has marked ${updatedQuery.enhancementId ? 'enhancement query' : 'query'} as resolved for claim ${refNumber}`,
+    //   });
+    // }
 
     if(documents?.length){
       const newDocs = documents.filter(doc => !doc.id);
@@ -165,13 +222,28 @@ export class QueriesService {
           select: { id: true , insuranceRequestId: true , enhancementId: true, fileName: true , type: true }
         })
         if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
-        await this.commonService.logInsuranceRequestChange({
-          userId: uploadedBy,
-          notifiedTo,
-          insuranceRequestId: updatedQuery.insuranceRequest.id,
-          hospitalId: patientHospitalId,
-          message:`${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
-        });
+        const message = `${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`
+        await Promise.all([
+          await this.commonService.logInsuranceRequestChange({
+            ...notifyAndHistoryPayload,
+            notifiedTo,
+            hospitalId: patientHospitalId,
+            message
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+            ...notifyAndHistoryPayload,
+            notifiedTo: patientHospitalId,
+            message
+          })
+        ])
+
+        // await this.commonService.logInsuranceRequestChange({
+        //   userId: uploadedBy,
+        //   notifiedTo,
+        //   insuranceRequestId: updatedQuery.insuranceRequest.id,
+        //   hospitalId: patientHospitalId,
+        //   message:`${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
+        // });
       }
 
       if(existingDocs?.length){
@@ -193,13 +265,28 @@ export class QueriesService {
           })
         );
         if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
-        await this.commonService.logInsuranceRequestChange({
-          userId: uploadedBy,
-          notifiedTo,
-          insuranceRequestId: updatedQuery.insuranceRequest.id,
-          hospitalId: patientHospitalId,
-            message:`${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
-        });
+
+        const message = `${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`
+        await Promise.all([
+          await this.commonService.logInsuranceRequestChange({
+            ...notifyAndHistoryPayload,
+            notifiedTo,
+            hospitalId: patientHospitalId,
+            message
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+            ...notifyAndHistoryPayload,
+            notifiedTo: patientHospitalId,
+            message
+          })
+        ])
+        // await this.commonService.logInsuranceRequestChange({
+        //   userId: uploadedBy,
+        //   notifiedTo,
+        //   insuranceRequestId: updatedQuery.insuranceRequest.id,
+        //   hospitalId: patientHospitalId,
+        //     message:`${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
+        // });
       }
     }
 

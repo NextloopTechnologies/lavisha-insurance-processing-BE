@@ -66,13 +66,15 @@ export class InsuranceRequestsService {
     // notify to super admin and hospital user
     const notificationPayload = {
       userId: uploadedBy,
-      notifiedTo: uploadedBy,
       insuranceRequestId: createdClaim.id,
       message: `${userName} created claim ${refNumber}`
     }
 
     await Promise.all([
-      await this.commonService.logInsuranceRequestNotification(notificationPayload),
+      await this.commonService.logInsuranceRequestNotification({
+        ...notificationPayload,
+        notifiedTo: uploadedBy,
+      }),
       await this.commonService.logInsuranceRequestNotification({
         ...notificationPayload,
         notifiedTo: isSuperAdminExists.id
@@ -94,7 +96,6 @@ export class InsuranceRequestsService {
     // notify and create comment for hospital and superadmin
     const notifyAndHistoryPayload = {
       userId: uploadedBy,
-      notifiedTo: uploadedBy,
       insuranceRequestId: createdClaim.id,
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
     }
@@ -102,6 +103,7 @@ export class InsuranceRequestsService {
     await Promise.all([
       await this.commonService.logInsuranceRequestChange({
         ...notifyAndHistoryPayload,
+        notifiedTo: uploadedBy,
         hospitalId: patientHospitalId,
       }),
       await this.commonService.logInsuranceRequestNotification({
@@ -235,15 +237,36 @@ export class InsuranceRequestsService {
         data: {
           assignee: { connect: { id: assigneeId }}
         },
-        select: { id: true, refNumber: true, assignedTo: true, assignee: { select: { id: true, name: true }} }
+        select: { 
+          id: true, refNumber: true, assignedTo: true, 
+          assignee: { select: { id: true, name: true }}, 
+          patient: { select: { hospitalUserId: true }} 
+        }
       })
       if(result) { 
-        await this.commonService.logInsuranceRequestNotification({
-          userId, 
-          notifiedTo: assigneeId,
+        // notify to claim hospital and its assignee
+        const notificationPayload = {
+          userId,
           insuranceRequestId: result.id,
           message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
-        })
+        }
+
+        await Promise.all([
+          await this.commonService.logInsuranceRequestNotification({
+            ...notificationPayload,
+            notifiedTo: assigneeId
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+            ...notificationPayload,
+            notifiedTo: result.patient.hospitalUserId
+          })
+        ])
+        // await this.commonService.logInsuranceRequestNotification({
+        //   userId, 
+        //   notifiedTo: assigneeId,
+        //   insuranceRequestId: result.id,
+        //   message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
+        // })
       }
       const { id, refNumber, assignedTo } = result
       return { 
@@ -304,15 +327,38 @@ export class InsuranceRequestsService {
         updatedClaim.id,
       );
 
-      if(data.status && claimExists.status !== data.status){
-        await this.commonService.logInsuranceRequestChange({
-          userId: uploadedBy,
-          notifiedTo: assigneeId,
-          insuranceRequestId: claimExists.id,
-          hospitalId: patientHospitalId,
-          message: `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`,
-        });
+      // notify and create comment for hospital and assignee
+      const notifyAndHistoryPayload = {
+        userId: uploadedBy,
+        insuranceRequestId: updatedClaim.id
       }
+
+      if(data.status && claimExists.status !== data.status){
+        const message = `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`
+        await Promise.all([
+          await this.commonService.logInsuranceRequestChange({
+            ...notifyAndHistoryPayload,
+            notifiedTo: assigneeId,
+            hospitalId: patientHospitalId,
+            message
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+            ...notifyAndHistoryPayload,
+            notifiedTo: patientHospitalId,
+            message
+          })
+        ])
+      }
+
+      // if(data.status && claimExists.status !== data.status){
+      //   await this.commonService.logInsuranceRequestChange({
+      //     userId: uploadedBy,
+      //     notifiedTo: assigneeId,
+      //     insuranceRequestId: claimExists.id,
+      //     hospitalId: patientHospitalId,
+      //     message: `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`,
+      //   });
+      // }
 
       if(documents?.length){
         const newDocs = documents.filter(doc => !doc.id);
@@ -330,14 +376,28 @@ export class InsuranceRequestsService {
           })
       
           if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
+          const message = `${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`
+          await Promise.all([
+            await this.commonService.logInsuranceRequestChange({
+              ...notifyAndHistoryPayload,
+              notifiedTo: assigneeId,
+              hospitalId: patientHospitalId,
+              message
+            }),
+            await this.commonService.logInsuranceRequestNotification({
+              ...notifyAndHistoryPayload,
+              notifiedTo: patientHospitalId,
+              message
+            })
+          ])
           
-          await this.commonService.logInsuranceRequestChange({
-            userId: uploadedBy,
-            notifiedTo: assigneeId,
-            insuranceRequestId: updatedClaim.id,
-            hospitalId: patientHospitalId,
-            message:`${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`,
-          });
+          // await this.commonService.logInsuranceRequestChange({
+          //   userId: uploadedBy,
+          //   notifiedTo: assigneeId,
+          //   insuranceRequestId: updatedClaim.id,
+          //   hospitalId: patientHospitalId,
+          //   message:`${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`,
+          // });
         }
 
         if(existingDocs?.length){
@@ -360,13 +420,27 @@ export class InsuranceRequestsService {
           );
           if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
 
-          await this.commonService.logInsuranceRequestChange({
-            userId: uploadedBy,
-            notifiedTo: assigneeId,
-            insuranceRequestId: updatedClaim.id,
-            hospitalId: patientHospitalId,
-            message:`${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`,
-          });
+          const message = `${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`
+          await Promise.all([
+            await this.commonService.logInsuranceRequestChange({
+              ...notifyAndHistoryPayload,
+              notifiedTo: assigneeId,
+              hospitalId: patientHospitalId,
+              message
+            }),
+            await this.commonService.logInsuranceRequestNotification({
+              ...notifyAndHistoryPayload,
+              notifiedTo: patientHospitalId,
+              message
+            })
+          ])
+          // await this.commonService.logInsuranceRequestChange({
+          //   userId: uploadedBy,
+          //   notifiedTo: assigneeId,
+          //   insuranceRequestId: updatedClaim.id,
+          //   hospitalId: patientHospitalId,
+          //   message:`${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`,
+          // });
         }
       }
 
