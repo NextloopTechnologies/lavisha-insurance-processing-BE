@@ -63,13 +63,23 @@ export class InsuranceRequestsService {
     if(!createdClaim) throw new BadRequestException("Failed to create claim!")
     const patientHospitalId = createdClaim.patient.hospital.id
 
-    // notify to super admin
-    await this.commonService.logInsuranceRequestNotification({
+    // notify to super admin and hospital user
+    const notificationPayload = {
       userId: uploadedBy,
-      notifiedTo: isSuperAdminExists.id,
       insuranceRequestId: createdClaim.id,
       message: `${userName} created claim ${refNumber}`
-    })
+    }
+
+    await Promise.all([
+      await this.commonService.logInsuranceRequestNotification({
+        ...notificationPayload,
+        notifiedTo: uploadedBy,
+      }),
+      await this.commonService.logInsuranceRequestNotification({
+        ...notificationPayload,
+        notifiedTo: isSuperAdminExists.id
+      })
+    ])
   
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
@@ -83,13 +93,24 @@ export class InsuranceRequestsService {
 
     if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
 
-    await this.commonService.logInsuranceRequestChange({
+    // notify and create comment for hospital and superadmin
+    const notifyAndHistoryPayload = {
       userId: uploadedBy,
-      notifiedTo: isSuperAdminExists.id,
       insuranceRequestId: createdClaim.id,
-      hospitalId: patientHospitalId,
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
-    });
+    }
+
+    await Promise.all([
+      await this.commonService.logInsuranceRequestChange({
+        ...notifyAndHistoryPayload,
+        notifiedTo: uploadedBy,
+        hospitalId: patientHospitalId,
+      }),
+      await this.commonService.logInsuranceRequestNotification({
+        ...notifyAndHistoryPayload,
+        notifiedTo: isSuperAdminExists.id
+      })
+    ])
   
     return {
       id: createdClaim.id,
@@ -216,15 +237,30 @@ export class InsuranceRequestsService {
         data: {
           assignee: { connect: { id: assigneeId }}
         },
-        select: { id: true, refNumber: true, assignedTo: true, assignee: { select: { id: true, name: true }} }
+        select: { 
+          id: true, refNumber: true, assignedTo: true, 
+          assignee: { select: { id: true, name: true }}, 
+          patient: { select: { hospitalUserId: true }} 
+        }
       })
       if(result) { 
-        await this.commonService.logInsuranceRequestNotification({
-          userId, 
-          notifiedTo: assigneeId,
+        // notify to claim hospital and its assignee
+        const notificationPayload = {
+          userId,
           insuranceRequestId: result.id,
           message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
-        })
+        }
+
+        await Promise.all([
+          await this.commonService.logInsuranceRequestNotification({
+            ...notificationPayload,
+            notifiedTo: assigneeId
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+            ...notificationPayload,
+            notifiedTo: result.patient.hospitalUserId
+          })
+        ])
       }
       const { id, refNumber, assignedTo } = result
       return { 
@@ -242,7 +278,7 @@ export class InsuranceRequestsService {
     }): Promise<MutateResponseInsuranceRequestDto> {
   
       const { where, data, uploadedBy, userName } = params;
-      const { patientId, assignedTo, documents, ...rest } = data;
+      const { patientId, assignedTo, documents, isBasicClaimUpdate, ...rest } = data;
       let updatedDocuments: DocumentResponseDto[] = []
       let createdDocuments: DocumentResponseDto[] = []
       let assigneeId: string;
@@ -252,8 +288,19 @@ export class InsuranceRequestsService {
         select: { id: true, assignedTo: true, status: true } 
       })
       if(!claimExists) throw new BadRequestException('Invalid claim ID');
-      if(!claimExists.assignedTo) throw new BadRequestException('Assign User first!');
-      assigneeId = claimExists.assignedTo
+
+      if(isBasicClaimUpdate) {
+        // if it is from basic claim edit without assignee
+        const isSuperAdminExists = await this.prisma.user.findFirst({ 
+          where: { role: Role.SUPER_ADMIN },
+          select: { id: true }
+        })
+        if (!isSuperAdminExists) throw new BadRequestException("No SuperAdmin found!")
+        assigneeId = isSuperAdminExists.id
+      } else {
+        if(!claimExists.assignedTo) throw new BadRequestException('Assign User first!');
+        assigneeId = claimExists.assignedTo 
+      }
 
       if (patientId) {
         const patient = await this.prisma.patient.findUnique({
@@ -285,14 +332,27 @@ export class InsuranceRequestsService {
         updatedClaim.id,
       );
 
+      // notify and create comment for hospital and assignee
+      const notifyAndHistoryPayload = {
+        userId: uploadedBy,
+        insuranceRequestId: updatedClaim.id
+      }
+
       if(data.status && claimExists.status !== data.status){
-        await this.commonService.logInsuranceRequestChange({
-          userId: uploadedBy,
-          notifiedTo: assigneeId,
-          insuranceRequestId: claimExists.id,
-          hospitalId: patientHospitalId,
-          message: `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`,
-        });
+        const message = `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`
+        await Promise.all([
+          await this.commonService.logInsuranceRequestChange({
+            ...notifyAndHistoryPayload,
+            notifiedTo: assigneeId,
+            hospitalId: patientHospitalId,
+            message
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+            ...notifyAndHistoryPayload,
+            notifiedTo: patientHospitalId,
+            message
+          })
+        ])
       }
 
       if(documents?.length){
@@ -311,14 +371,20 @@ export class InsuranceRequestsService {
           })
       
           if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
-          
-          await this.commonService.logInsuranceRequestChange({
-            userId: uploadedBy,
-            notifiedTo: assigneeId,
-            insuranceRequestId: updatedClaim.id,
-            hospitalId: patientHospitalId,
-            message:`${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`,
-          });
+          const message = `${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`
+          await Promise.all([
+            await this.commonService.logInsuranceRequestChange({
+              ...notifyAndHistoryPayload,
+              notifiedTo: assigneeId,
+              hospitalId: patientHospitalId,
+              message
+            }),
+            await this.commonService.logInsuranceRequestNotification({
+              ...notifyAndHistoryPayload,
+              notifiedTo: patientHospitalId,
+              message
+            })
+          ])
         }
 
         if(existingDocs?.length){
@@ -341,13 +407,20 @@ export class InsuranceRequestsService {
           );
           if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
 
-          await this.commonService.logInsuranceRequestChange({
-            userId: uploadedBy,
-            notifiedTo: assigneeId,
-            insuranceRequestId: updatedClaim.id,
-            hospitalId: patientHospitalId,
-            message:`${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`,
-          });
+          const message = `${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`
+          await Promise.all([
+            await this.commonService.logInsuranceRequestChange({
+              ...notifyAndHistoryPayload,
+              notifiedTo: assigneeId,
+              hospitalId: patientHospitalId,
+              message
+            }),
+            await this.commonService.logInsuranceRequestNotification({
+              ...notifyAndHistoryPayload,
+              notifiedTo: patientHospitalId,
+              message
+            })
+          ])
         }
       }
 

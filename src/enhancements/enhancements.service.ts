@@ -51,12 +51,23 @@ export class EnhancementsService {
         const notifiedTo = createdEnhancement.insuranceRequest.assignedTo
         const refNumber = createdEnhancement.insuranceRequest.refNumber
 
-        await this.commonService.logInsuranceRequestNotification({
+        // notify to assignee and hospital user
+        const notificationPayload = {
             userId: uploadedBy,
-            notifiedTo,
             insuranceRequestId,
             message: `${userName} created enhancement for claim ${refNumber}`
-        })
+        }
+
+        await Promise.all([
+            await this.commonService.logInsuranceRequestNotification({
+                ...notificationPayload,
+                notifiedTo,
+            }),
+            await this.commonService.logInsuranceRequestNotification({
+                ...notificationPayload,
+                notifiedTo: patientHospitalId
+            })
+        ])
 
         const createdDocuments = await this.prisma.document.createManyAndReturn({
           data: documents.map((document) => ({
@@ -70,13 +81,24 @@ export class EnhancementsService {
     
         if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
 
-        await this.commonService.logInsuranceRequestChange({
+        // notify and create comment for hospital and assignee
+        const notifyAndHistoryPayload = {
             userId: uploadedBy,
-            notifiedTo,
             insuranceRequestId,
-            hospitalId: patientHospitalId,
             message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`,
-        });
+        }
+
+        await Promise.all([
+            await this.commonService.logInsuranceRequestChange({
+                ...notifyAndHistoryPayload,
+                notifiedTo,
+                hospitalId: patientHospitalId,
+            }),
+            await this.commonService.logInsuranceRequestNotification({
+                ...notifyAndHistoryPayload,
+                notifiedTo: patientHospitalId
+            })
+        ])
     
         return {
           id: createdEnhancement.id,
@@ -138,14 +160,27 @@ export class EnhancementsService {
             updatedEnhancement.id,
         );
 
+        // notify and create comment for hospital and assignee
+        const notifyAndHistoryPayload = {
+            userId: uploadedBy,
+            insuranceRequestId: updatedEnhancement.insuranceRequest.id
+        }
+
         if(data.status && enhancementExists.status !== data.status){
-            await this.commonService.logInsuranceRequestChange({
-                userId: uploadedBy,
-                notifiedTo,
-                insuranceRequestId: updatedEnhancement.insuranceRequest.id,
-                hospitalId: patientHospitalId,
-                message: `${userName} updated status from ${enhancementExists.status} to ${data.status} for ${refNumber}'s enhancement.`,
-            });
+            const message = `${userName} updated status from ${enhancementExists.status} to ${data.status} for ${refNumber}'s enhancement.`
+            await Promise.all([
+                await this.commonService.logInsuranceRequestChange({
+                    ...notifyAndHistoryPayload,
+                    notifiedTo,
+                    hospitalId: patientHospitalId,
+                    message
+                }),
+                await this.commonService.logInsuranceRequestNotification({
+                    ...notifyAndHistoryPayload,
+                    notifiedTo: patientHospitalId,
+                    message
+                })
+            ])
         }
 
         if(documents?.length){
@@ -164,13 +199,21 @@ export class EnhancementsService {
                     select: { id: true , insuranceRequestId: true , enhancementId: true, fileName: true , type: true }
                 })
                 if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
-                await this.commonService.logInsuranceRequestChange({
-                    userId: uploadedBy,
-                    notifiedTo,
-                    insuranceRequestId: updatedEnhancement.insuranceRequest.id,
-                    hospitalId: patientHospitalId,
-                    message:`${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`,
-                });
+
+                const message = `${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`
+                await Promise.all([
+                    await this.commonService.logInsuranceRequestChange({
+                        ...notifyAndHistoryPayload,
+                        notifiedTo,
+                        hospitalId: patientHospitalId,
+                        message
+                    }),
+                    await this.commonService.logInsuranceRequestNotification({
+                        ...notifyAndHistoryPayload,
+                        notifiedTo: patientHospitalId,
+                        message
+                    })
+                ])
             }
 
             if(existingDocs?.length){
@@ -192,13 +235,21 @@ export class EnhancementsService {
                     })
                 );
                 if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
-                 await this.commonService.logInsuranceRequestChange({
-                    userId: uploadedBy,
-                    notifiedTo,
-                    insuranceRequestId: updatedEnhancement.insuranceRequest.id,
-                    hospitalId: patientHospitalId,
-                    message:`${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s enhancement.`,
-                });
+
+                const message = `${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s enhancement.`
+                await Promise.all([
+                    await this.commonService.logInsuranceRequestChange({
+                        ...notifyAndHistoryPayload,
+                        notifiedTo,
+                        hospitalId: patientHospitalId,
+                        message
+                    }),
+                    await this.commonService.logInsuranceRequestNotification({
+                        ...notifyAndHistoryPayload,
+                        notifiedTo: patientHospitalId,
+                        message
+                    })
+                ])
             }
         }
 
