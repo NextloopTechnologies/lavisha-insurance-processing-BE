@@ -91,6 +91,14 @@ export class CreateInsuranceRequestDto {
     @IsString()
     actualQuotedAmount?: string;
 
+    @ApiPropertyOptional({ 
+        example: true, 
+        description: 'this is needed when unassigned claim needs a basic update when triggered from pencil edit icon on DRAFT and PENDING status' 
+    })
+    @IsOptional()
+    @IsBoolean()
+    isBasicClaimUpdate?: boolean;
+
     @ApiProperty({ type: [CreateDocumentInput] })
     @IsArray()
     @ValidateNested({ each: true })

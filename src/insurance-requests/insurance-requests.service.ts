@@ -284,7 +284,7 @@ export class InsuranceRequestsService {
     }): Promise<MutateResponseInsuranceRequestDto> {
   
       const { where, data, uploadedBy, userName } = params;
-      const { patientId, assignedTo, documents, ...rest } = data;
+      const { patientId, assignedTo, documents, isBasicClaimUpdate, ...rest } = data;
       let updatedDocuments: DocumentResponseDto[] = []
       let createdDocuments: DocumentResponseDto[] = []
       let assigneeId: string;
@@ -294,8 +294,19 @@ export class InsuranceRequestsService {
         select: { id: true, assignedTo: true, status: true } 
       })
       if(!claimExists) throw new BadRequestException('Invalid claim ID');
-      if(!claimExists.assignedTo) throw new BadRequestException('Assign User first!');
-      assigneeId = claimExists.assignedTo
+
+      if(isBasicClaimUpdate) {
+        // if it is from basic claim edit without assignee
+        const isSuperAdminExists = await this.prisma.user.findFirst({ 
+          where: { role: Role.SUPER_ADMIN },
+          select: { id: true }
+        })
+        if (!isSuperAdminExists) throw new BadRequestException("No SuperAdmin found!")
+        assigneeId = isSuperAdminExists.id
+      } else {
+        if(!claimExists.assignedTo) throw new BadRequestException('Assign User first!');
+        assigneeId = claimExists.assignedTo 
+      }
 
       if (patientId) {
         const patient = await this.prisma.patient.findUnique({
