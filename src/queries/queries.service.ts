@@ -69,12 +69,6 @@ export class QueriesService {
             notifiedTo: patientHospitalId
         })
     ])
-    // await this.commonService.logInsuranceRequestNotification({
-    //   userId: uploadedBy,
-    //   notifiedTo,
-    //   insuranceRequestId,
-    //   message: `${userName} created ${enhancementId ? 'enhancement query' : 'query'} for claim ${refNumber}`
-    // })
 
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
@@ -107,14 +101,6 @@ export class QueriesService {
         notifiedTo: patientHospitalId
       })
     ])
-
-    // await this.commonService.logInsuranceRequestChange({
-    //   userId: uploadedBy,
-    //   notifiedTo,
-    //   insuranceRequestId,
-    //   hospitalId: patientHospitalId,
-    //   message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
-    // });
 
     return {
       id: createdQuery.id,
@@ -196,14 +182,6 @@ export class QueriesService {
           })
       ])
     }
-    // if(data.isResolved){
-    //   await this.commonService.logInsuranceRequestNotification({
-    //     userId: uploadedBy,
-    //     notifiedTo,
-    //     insuranceRequestId: updatedQuery.insuranceRequest.id,
-    //     message: `${userName} has marked ${updatedQuery.enhancementId ? 'enhancement query' : 'query'} as resolved for claim ${refNumber}`,
-    //   });
-    // }
 
     if(documents?.length){
       const newDocs = documents.filter(doc => !doc.id);
@@ -236,14 +214,6 @@ export class QueriesService {
             message
           })
         ])
-
-        // await this.commonService.logInsuranceRequestChange({
-        //   userId: uploadedBy,
-        //   notifiedTo,
-        //   insuranceRequestId: updatedQuery.insuranceRequest.id,
-        //   hospitalId: patientHospitalId,
-        //   message:`${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
-        // });
       }
 
       if(existingDocs?.length){
@@ -280,13 +250,6 @@ export class QueriesService {
             message
           })
         ])
-        // await this.commonService.logInsuranceRequestChange({
-        //   userId: uploadedBy,
-        //   notifiedTo,
-        //   insuranceRequestId: updatedQuery.insuranceRequest.id,
-        //   hospitalId: patientHospitalId,
-        //     message:`${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
-        // });
       }
     }
 

@@ -68,12 +68,6 @@ export class EnhancementsService {
                 notifiedTo: patientHospitalId
             })
         ])
-        // await this.commonService.logInsuranceRequestNotification({
-        //     userId: uploadedBy,
-        //     notifiedTo,
-        //     insuranceRequestId,
-        //     message: `${userName} created enhancement for claim ${refNumber}`
-        // })
 
         const createdDocuments = await this.prisma.document.createManyAndReturn({
           data: documents.map((document) => ({
@@ -105,14 +99,6 @@ export class EnhancementsService {
                 notifiedTo: patientHospitalId
             })
         ])
-
-        // await this.commonService.logInsuranceRequestChange({
-        //     userId: uploadedBy,
-        //     notifiedTo,
-        //     insuranceRequestId,
-        //     hospitalId: patientHospitalId,
-        //     message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`,
-        // });
     
         return {
           id: createdEnhancement.id,
@@ -196,16 +182,6 @@ export class EnhancementsService {
                 })
             ])
         }
-     
-        // if(data.status && enhancementExists.status !== data.status){
-        //     await this.commonService.logInsuranceRequestChange({
-        //         userId: uploadedBy,
-        //         notifiedTo,
-        //         insuranceRequestId: updatedEnhancement.insuranceRequest.id,
-        //         hospitalId: patientHospitalId,
-        //         message: `${userName} updated status from ${enhancementExists.status} to ${data.status} for ${refNumber}'s enhancement.`,
-        //     });
-        // }
 
         if(documents?.length){
             const newDocs = documents.filter(doc => !doc.id);
@@ -238,13 +214,6 @@ export class EnhancementsService {
                         message
                     })
                 ])
-                // await this.commonService.logInsuranceRequestChange({
-                //     userId: uploadedBy,
-                //     notifiedTo,
-                //     insuranceRequestId: updatedEnhancement.insuranceRequest.id,
-                //     hospitalId: patientHospitalId,
-                //     message:`${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`,
-                // });
             }
 
             if(existingDocs?.length){
@@ -281,13 +250,6 @@ export class EnhancementsService {
                         message
                     })
                 ])
-                // await this.commonService.logInsuranceRequestChange({
-                //     userId: uploadedBy,
-                //     notifiedTo,
-                //     insuranceRequestId: updatedEnhancement.insuranceRequest.id,
-                //     hospitalId: patientHospitalId,
-                //     message:`${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s enhancement.`,
-                // });
             }
         }
 

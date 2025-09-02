@@ -261,12 +261,6 @@ export class InsuranceRequestsService {
             notifiedTo: result.patient.hospitalUserId
           })
         ])
-        // await this.commonService.logInsuranceRequestNotification({
-        //   userId, 
-        //   notifiedTo: assigneeId,
-        //   insuranceRequestId: result.id,
-        //   message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
-        // })
       }
       const { id, refNumber, assignedTo } = result
       return { 
@@ -361,16 +355,6 @@ export class InsuranceRequestsService {
         ])
       }
 
-      // if(data.status && claimExists.status !== data.status){
-      //   await this.commonService.logInsuranceRequestChange({
-      //     userId: uploadedBy,
-      //     notifiedTo: assigneeId,
-      //     insuranceRequestId: claimExists.id,
-      //     hospitalId: patientHospitalId,
-      //     message: `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`,
-      //   });
-      // }
-
       if(documents?.length){
         const newDocs = documents.filter(doc => !doc.id);
         const existingDocs = documents.filter(doc => doc.id);
@@ -401,14 +385,6 @@ export class InsuranceRequestsService {
               message
             })
           ])
-          
-          // await this.commonService.logInsuranceRequestChange({
-          //   userId: uploadedBy,
-          //   notifiedTo: assigneeId,
-          //   insuranceRequestId: updatedClaim.id,
-          //   hospitalId: patientHospitalId,
-          //   message:`${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`,
-          // });
         }
 
         if(existingDocs?.length){
@@ -445,13 +421,6 @@ export class InsuranceRequestsService {
               message
             })
           ])
-          // await this.commonService.logInsuranceRequestChange({
-          //   userId: uploadedBy,
-          //   notifiedTo: assigneeId,
-          //   insuranceRequestId: updatedClaim.id,
-          //   hospitalId: patientHospitalId,
-          //   message:`${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`,
-          // });
         }
       }
 
