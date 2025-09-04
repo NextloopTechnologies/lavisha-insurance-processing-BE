@@ -20,8 +20,8 @@ export class CommentsController {
   @ApiResponse({ status: 201, description: 'Comment created successfully.' })
   @ApiResponse({ status: 400, description: 'Bad Request' })
   create(@Request() req, @Body() data: CreateCommentsDto): Promise<Comment> {
-    const { userId:createdBy, role, hospitalId:loggedInUserHospitalId } = req.user;
-    return this.commentsService.create(role, data, createdBy, loggedInUserHospitalId)
+    const { userId:createdBy, role, name, hospitalId:loggedInUserHospitalId } = req.user;
+    return this.commentsService.create(role, data, createdBy, loggedInUserHospitalId, name)
   }
 
   @Get()

@@ -23,7 +23,7 @@ export class NotificationsService {
         } 
       }),
       this.prisma.notification.findMany({
-        skip,
+          skip,
           take,
           where,
           orderBy,
@@ -40,11 +40,11 @@ export class NotificationsService {
   }
 
   async update(params: {
-    where: Prisma.NotificationWhereUniqueInput, 
+    where: Prisma.NotificationWhereInput, 
     data: Prisma.NotificationUpdateInput
-  }): Promise<ResponseNotificationDto> {
+  }): Promise<{ count: number }> {
     const { where, data } = params
-    return this.prisma.notification.update({
+    return this.prisma.notification.updateMany({
       where,
       data
     });

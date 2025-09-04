@@ -11,7 +11,8 @@ export class CommentsService {
         role: string,
         data: CreateCommentsDto, 
         createdBy: string,
-        loggedInUserHospitalId: string
+        loggedInUserHospitalId: string,
+        creatorName: string
     ): Promise<Comment> {
         const { insuranceRequestId, hospitalId: payloadHospitalId, ...rest } = data;
         let hospitalIdForCreateQuery: string
@@ -42,16 +43,33 @@ export class CommentsService {
             if (!insuranceRequest) throw new BadRequestException('Invalid claim ID');
         }
        
-        return await this.prisma.comment.create({ 
+        const comment = await this.prisma.comment.create({ 
           data : { 
             hospital: { connect: { id: hospitalIdForCreateQuery }}, 
             ...rest, 
             ...(insuranceRequestId ? { insuranceRequest: { connect: { id: insuranceRequestId }}} : undefined), 
             ...(insuranceRequestId && { isRead: true }),
             creator: { connect: { id: createdBy }} 
+          },
+          include: {
+            insuranceRequest: { select: { assignedTo: true }}
           }
         });
+        // if(comment && comment.type===CommentType.HOSPITAL_NOTE) {
+        //     // notify to assignee if hospital manager post
+        //     if(role===Role.HOSPITAL_MANAGER) {
+        //         const notifiedTo = comment.insuranceRequest.assignedTo;
+        //         await this.prisma.notification.create({
+        //             data: {
+        //                 user: { connect: { id: notifiedTo }},
+        //                 message: data.text,
+        //             },
+        //         })
+        //     }
+        // }
+        return comment
       }
+
     
     async findAll(params: {
         take?: number;
