@@ -25,6 +25,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.COMMENT_LIST,
     Permission.COMMENT_MARK_READ,
     Permission.COMMENT_MANAGER_LIST,
+    Permission.COMMENT_MANAGER_CHAT_UNREAD_COUNT,
     // dashboard
     Permission.DASHBOARD_READ,
     // enhancements
@@ -56,6 +57,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.COMMENT_LIST,
     Permission.COMMENT_MARK_READ,
     Permission.COMMENT_MANAGER_LIST,
+    Permission.COMMENT_MANAGER_CHAT_UNREAD_COUNT,
     Permission.DASHBOARD_READ,
     Permission.ENHANCEMENT_CREATE,
     Permission.ENHANCEMENT_UPDATE,
@@ -106,6 +108,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.FILE_BULK_UPLOAD,
     Permission.COMMENT_CREATE,
     Permission.COMMENT_LIST,
+    Permission.COMMENT_MANAGER_CHAT_UNREAD_COUNT,
     Permission.DASHBOARD_READ,
     Permission.ENHANCEMENT_CREATE,
     Permission.ENHANCEMENT_UPDATE,

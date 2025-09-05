@@ -3,7 +3,7 @@ import { CommentsService } from './comments.service';
 import { CreateCommentsDto } from './dto/create-comments.dto';
 import { Comment, CommentType, Prisma, Role } from '@prisma/client';
 import { FindAllCommentsDto } from './dto/find-all-comments.dto';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
 
@@ -20,8 +20,8 @@ export class CommentsController {
   @ApiResponse({ status: 201, description: 'Comment created successfully.' })
   @ApiResponse({ status: 400, description: 'Bad Request' })
   create(@Request() req, @Body() data: CreateCommentsDto): Promise<Comment> {
-    const { userId:createdBy, role, name, hospitalId:loggedInUserHospitalId } = req.user;
-    return this.commentsService.create(role, data, createdBy, loggedInUserHospitalId, name)
+    const { userId:createdBy, role, hospitalId:loggedInUserHospitalId } = req.user;
+    return this.commentsService.create(role, data, createdBy, loggedInUserHospitalId)
   }
 
   @Get()
@@ -40,21 +40,9 @@ export class CommentsController {
       hospitalId
     } = query;
     let hospitalIdForWhereClause:string
-    const isHospitalIdInQuery = hospitalId ? true : false
-    // const allowedTypes: Record<Role, CommentType[]> = {
-    //   SUPER_ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE','SYSTEM'],
-    //   ADMIN: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
-    //   HOSPITAL_MANAGER: ['NOTE', 'QUERY', 'TPA_REPLY', 'HOSPITAL_NOTE', 'SYSTEM'],
-    //   HOSPITAL: ['NOTE','QUERY', 'TPA_REPLY','SYSTEM'],
-    // };
-    // assign hospitalId wise filter
-    if(role === Role.HOSPITAL) hospitalIdForWhereClause = currentUserId
-    else if (role === Role.HOSPITAL_MANAGER) {
-      if(!loggedInUserHospitalId) throw new BadRequestException(`Assign Hospital first for role ${role}`)
-      hospitalIdForWhereClause = loggedInUserHospitalId
-    }
-    else if(role===Role.ADMIN||role===Role.SUPER_ADMIN) hospitalIdForWhereClause = hospitalId
-    
+    // only ADMIN and SUPERADMIN will have hospitalId else it can't be in same query with claimId 
+    // hospitalId in query means they are requesting manager chats
+    const isHospitalIdInQuery = hospitalId ? true : false 
     if(role===Role.HOSPITAL){
       if(!insuranceRequestId) {
         throw new BadRequestException(`insuranceRequestId/claim uuid is required in query param for Role ${role}`)
@@ -63,13 +51,21 @@ export class CommentsController {
         throw new BadRequestException(`Role ${role} can only access claim comments`)
       }
     }
-
+    // assign hospitalId wise filter for claim based comments
+    if(role === Role.HOSPITAL) hospitalIdForWhereClause = currentUserId
+    else if (role === Role.HOSPITAL_MANAGER) {
+      if(!loggedInUserHospitalId) throw new BadRequestException(`Assign Hospital first for role ${role}`)
+      hospitalIdForWhereClause = loggedInUserHospitalId
+    }
+    else if(role===Role.ADMIN||role===Role.SUPER_ADMIN) hospitalIdForWhereClause = hospitalId
+    // for claimId any role have to provide it to get claim based comments
+    // for manager level hospitalId is needed for admin and superadmin, and type=HOSPITAL_NOTE for manager
     const where: Prisma.CommentWhereInput = {
-      ...(insuranceRequestId && { insuranceRequestId }),
+      ...(insuranceRequestId && { insuranceRequestId }), 
       ...(createdBy && { createdBy }),
       ...(hospitalIdForWhereClause && { hospitalId: hospitalIdForWhereClause }) ,
-      ...(isHospitalIdInQuery && { type: CommentType.HOSPITAL_NOTE })
-      // type: { in: allowedTypes[role] },
+      ...(isHospitalIdInQuery && { type: CommentType.HOSPITAL_NOTE }),
+      ...(type && { type })
     };
 
     return this.commentsService.findAll({ 
@@ -89,6 +85,17 @@ export class CommentsController {
     const { userId: currentUserId } = req.user;
     if(!hospitalId) throw new BadRequestException("hospitalId is required in query!");
     return this.commentsService.markRead(hospitalId, currentUserId);
+  }
+
+  @Get('/manager_chats_unReadCount')
+  @Permissions(Permission.COMMENT_MANAGER_CHAT_UNREAD_COUNT,)
+  @ApiOperation({ summary: 'Get unread counts on manager chats' })
+  @ApiResponse({ status: 200, description: 'count' })
+  managerChatsUnReadCount(
+    @Request() req
+  ): Promise<{ count: number }> {
+    const { userId , role, hospitalId } = req.user
+    return this.commentsService.managerChatsUnReadCount({ role, userId, hospitalId })
   }
 
   @Get('/list_manager_comments')

@@ -8,11 +8,10 @@ export class CommentsService {
     constructor(private prisma: PrismaService) {}
     
      async create(
-        role: string,
+        role: Role,
         data: CreateCommentsDto, 
         createdBy: string,
-        loggedInUserHospitalId: string,
-        creatorName: string
+        loggedInUserHospitalId: string
     ): Promise<Comment> {
         const { insuranceRequestId, hospitalId: payloadHospitalId, ...rest } = data;
         let hospitalIdForCreateQuery: string
@@ -43,31 +42,15 @@ export class CommentsService {
             if (!insuranceRequest) throw new BadRequestException('Invalid claim ID');
         }
        
-        const comment = await this.prisma.comment.create({ 
+        return await this.prisma.comment.create({ 
           data : { 
             hospital: { connect: { id: hospitalIdForCreateQuery }}, 
             ...rest, 
             ...(insuranceRequestId ? { insuranceRequest: { connect: { id: insuranceRequestId }}} : undefined), 
             ...(insuranceRequestId && { isRead: true }),
             creator: { connect: { id: createdBy }} 
-          },
-          include: {
-            insuranceRequest: { select: { assignedTo: true }}
           }
         });
-        // if(comment && comment.type===CommentType.HOSPITAL_NOTE) {
-        //     // notify to assignee if hospital manager post
-        //     if(role===Role.HOSPITAL_MANAGER) {
-        //         const notifiedTo = comment.insuranceRequest.assignedTo;
-        //         await this.prisma.notification.create({
-        //             data: {
-        //                 user: { connect: { id: notifiedTo }},
-        //                 message: data.text,
-        //             },
-        //         })
-        //     }
-        // }
-        return comment
       }
 
     
@@ -124,6 +107,23 @@ export class CommentsService {
         });
     }
 
+    async managerChatsUnReadCount(params: {
+        role: Role;
+        userId: string;
+        hospitalId: string;
+    }): Promise<{ count: number }> {
+        const { role, userId, hospitalId } = params
+
+        const count = await this.prisma.comment.count({
+            where : {
+                ...(role===Role.HOSPITAL_MANAGER && { hospitalId }), //for manager gives hospital relation comments
+                isRead: false,
+                type: CommentType.HOSPITAL_NOTE,
+                createdBy: { not: userId }
+            }
+        })
+        return { count }
+    }
 
     async listHospitalsWithManagerComments() {
         const latestComments: Comment[] = await this.prisma.$queryRaw`
