@@ -29,6 +29,10 @@ export class PatientsController {
     else if(role===Role.HOSPITAL_MANAGER) {
       if(!hospitalId) throw new BadRequestException(`${role} should have hospitalId`)
       hospitalUserId = hospitalId
+    } else if([Role.ADMIN, Role.SUPER_ADMIN].includes(role)) {
+      if(!createPatientDto.hospitalId) throw new BadRequestException("HospitalId is required for ADMIN/SUPER_ADMIN")
+      hospitalUserId = createPatientDto.hospitalId
+      delete createPatientDto.hospitalId // FK ids can't be directly added in prisma
     }
     return this.patientsService.create(createPatientDto, hospitalUserId);
   }
@@ -59,7 +63,7 @@ export class PatientsController {
     @Request() req,
     @Query() query: FindAllPatientDto
   ) {
-    const { skip, take, sortBy, sortOrder, name, age } = query;
+    const { skip, take, sortBy, sortOrder, name, age, hospitalId: hospitalIdFromQuery } = query;
     const { userId: currentUserId, role, hospitalId } = req.user
     let hospitalUserId:string
 
@@ -67,6 +71,8 @@ export class PatientsController {
     else if(role===Role.HOSPITAL_MANAGER) {
       if(!hospitalId) throw new BadRequestException(`${role} should have hospitalId`)
       hospitalUserId = hospitalId
+    } else if([Role.ADMIN, Role.SUPER_ADMIN].includes(role)) {
+      hospitalUserId = hospitalIdFromQuery
     }
 
     const where: Prisma.PatientWhereInput = {};
