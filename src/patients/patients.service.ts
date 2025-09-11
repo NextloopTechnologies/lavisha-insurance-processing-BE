@@ -36,7 +36,8 @@ export class PatientsService {
       },
       select: {
         id: true,
-        name: true
+        name: true,
+        hospital: { select: { name: true }}
       },
       orderBy: { createdAt: 'desc' },
       take: 20,

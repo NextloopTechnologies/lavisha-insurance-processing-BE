@@ -192,6 +192,7 @@ export class DashboardService {
     // average settlement amount based on percentage
     const allSettlementAmounts = await this.prisma.insuranceRequest.findMany({
       where: {
+        ...claimWhere,
         status: ClaimStatus.SETTLED,
         settlementAmount: { not: null },
         actualQuotedAmount: { not: null },
@@ -211,9 +212,10 @@ export class DashboardService {
       })
       .filter(p => p !== null);
 
-    const averageSettlementPercentage =
-      validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length;  
-      
+    const averageSettlementPercentage = validPercentages.length 
+    ? (validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length).toFixed(2)
+    : "0.00";
+
     return {
       activeClaims,
       totalPatients,

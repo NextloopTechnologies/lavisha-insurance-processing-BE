@@ -8,7 +8,7 @@ export class CommentsService {
     constructor(private prisma: PrismaService) {}
     
      async create(
-        role: string,
+        role: Role,
         data: CreateCommentsDto, 
         createdBy: string,
         loggedInUserHospitalId: string
@@ -52,6 +52,7 @@ export class CommentsService {
           }
         });
       }
+
     
     async findAll(params: {
         take?: number;
@@ -106,6 +107,23 @@ export class CommentsService {
         });
     }
 
+    async managerChatsUnReadCount(params: {
+        role: Role;
+        userId: string;
+        hospitalId: string;
+    }): Promise<{ count: number }> {
+        const { role, userId, hospitalId } = params
+
+        const count = await this.prisma.comment.count({
+            where : {
+                ...(role===Role.HOSPITAL_MANAGER && { hospitalId }), //for manager gives hospital relation comments
+                isRead: false,
+                type: CommentType.HOSPITAL_NOTE,
+                createdBy: { not: userId }
+            }
+        })
+        return { count }
+    }
 
     async listHospitalsWithManagerComments() {
         const latestComments: Comment[] = await this.prisma.$queryRaw`

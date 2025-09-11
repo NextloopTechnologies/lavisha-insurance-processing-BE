@@ -1,4 +1,4 @@
-import { Controller, Get, Body, Patch, Param, Request, Query } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Request, Query } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FindAllNotificationsDto } from './dto/find-all-notification.dto';
@@ -7,6 +7,7 @@ import { PaginatedResult } from 'src/common/interfaces/paginated-result.interfac
 import { ResponseNotificationDto } from './dto/response-notification.dto';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
+import { UpdateNotificationDto } from './dto/update-notification.dto';
 
 @Controller('notifications')
 @ApiTags('Notifications')
@@ -25,25 +26,36 @@ export class NotificationsController {
     const userId = req.user.userId;
     const where: Prisma.NotificationWhereInput = { userId }
 
-    const { skip, take, sortBy, sortOrder, isRead } = query
+    const { sortBy, sortOrder, isRead } = query
     if (typeof isRead !== 'undefined') {
       where.isRead = isRead === 'true';
     }
     const orderBy = sortBy ? { [sortBy]: sortOrder } : undefined;
 
-    return this.notificationsService.findAll({ skip, take, where, orderBy });
+    return this.notificationsService.findAll({ where, orderBy });
   }
 
-  @Patch(':id')
+  @Patch()
   @Permissions(Permission.NOTIFICATION_MARK_READ)
   @ApiOperation({ summary: 'Update notification by isRead' })
   @ApiResponse({ status: 200, type: ResponseNotificationDto })
   update(
-    @Param('id') id: string
-  ): Promise<ResponseNotificationDto> {
+    @Request() req,
+    @Body() data: UpdateNotificationDto
+  ): Promise<{ count:number }> {
+    const { userId } = req.user
+    const { markAllRead, batchRead } = data
 
+    const where: Prisma.NotificationWhereInput = markAllRead
+    ? { userId, isRead: false }
+    : { 
+      userId, 
+      isRead: false,  
+      ...((batchRead && batchRead.length > 0) && { id: { in: batchRead } })
+    };
+    
     return this.notificationsService.update({
-      where: { id },
+      where,
       data: { isRead: true }
     });
   }

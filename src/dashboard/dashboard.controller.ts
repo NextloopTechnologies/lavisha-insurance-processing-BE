@@ -1,4 +1,4 @@
-import { Controller, ForbiddenException, Get, Query,  Request } from '@nestjs/common';
+import { BadRequestException, Controller, ForbiddenException, Get, Query,  Request } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { FilterDashboardDto } from './dto/filter-dashboard.dto';
 import { Role } from '@prisma/client';
@@ -22,16 +22,20 @@ export class DashboardController {
     @Request() req,
     @Query() query: FilterDashboardDto 
   ) {
-    const { userId, role } = req.user
+    const { userId: currentUserId, role, hospitalId } = req.user
+    let hospitalUserId;
     switch (role) {
       case Role.SUPER_ADMIN:
         return this.dashboardService.adminDashboard(query)
       case Role.ADMIN:
         return this.dashboardService.adminDashboard(query)
       case Role.HOSPITAL_MANAGER: 
-        return this.dashboardService.hospitalDashboard(userId, query)
+        hospitalUserId = hospitalId
+        if(!hospitalUserId) throw new BadRequestException("Invalid HospitalID!")
+        return this.dashboardService.hospitalDashboard(hospitalUserId, query)
       case Role.HOSPITAL: 
-        return this.dashboardService.hospitalDashboard(userId, query)
+        hospitalUserId = currentUserId
+        return this.dashboardService.hospitalDashboard(hospitalUserId, query)
       default:
         throw new ForbiddenException("Roles not allowed")
     }
