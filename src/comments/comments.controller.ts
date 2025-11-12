@@ -35,14 +35,14 @@ export class CommentsController {
   ): Promise<Comment[]> {
     const { userId:currentUserId, role, hospitalId:loggedInUserHospitalId } = req.user
     const {
-      take, cursor, type, 
+      take, cursor, type,
       insuranceRequestId, createdBy,
       hospitalId
     } = query;
     let hospitalIdForWhereClause:string
     // only ADMIN and SUPERADMIN will have hospitalId else it can't be in same query with claimId 
     // hospitalId in query means they are requesting manager chats
-    const isHospitalIdInQuery = hospitalId ? true : false 
+    const isHospitalIdInQuery = hospitalId ? true : false
     if(role===Role.HOSPITAL){
       if(!insuranceRequestId) {
         throw new BadRequestException(`insuranceRequestId/claim uuid is required in query param for Role ${role}`)
@@ -61,16 +61,16 @@ export class CommentsController {
     // for claimId any role have to provide it to get claim based comments
     // for manager level hospitalId is needed for admin and superadmin, and type=HOSPITAL_NOTE for manager
     const where: Prisma.CommentWhereInput = {
-      ...(insuranceRequestId && { insuranceRequestId }), 
+      ...(insuranceRequestId && { insuranceRequestId }),
       ...(createdBy && { createdBy }),
       ...(hospitalIdForWhereClause && { hospitalId: hospitalIdForWhereClause }) ,
       ...(isHospitalIdInQuery && { type: CommentType.HOSPITAL_NOTE }),
       ...(type && { type })
     };
 
-    return this.commentsService.findAll({ 
-      take, cursor, where, 
-      currentUserId, role, 
+    return this.commentsService.findAll({
+      take, cursor, where,
+      currentUserId, role,
       loggedInUserHospitalId
     });
   }
@@ -105,5 +105,24 @@ export class CommentsController {
   listHospitalsWithManagerComments() {
     return this.commentsService.listHospitalsWithManagerComments()
   }
+
+
+  @Patch('mark_read')
+  @ApiOperation({ summary: 'Mark comments as read based on user role and claim' })
+  async markCommentsAsRead(
+    @Request() req,
+    @Body() body: { insuranceRequestId: string }
+  ) {
+    const { userId, role } = req.user;
+    const { insuranceRequestId } = body;
+
+    if (!insuranceRequestId) {
+      throw new BadRequestException('insuranceRequestId is required');
+    }
+
+    return this.commentsService.markCommentsAsRead({ userId, role, insuranceRequestId });
+  }
+
+
 
 }

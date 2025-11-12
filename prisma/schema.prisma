@@ -113,6 +113,14 @@ model InsuranceRequest {
   actualQuotedAmount  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  totalBill             String?   
+  totalApproval         String?   
+  totalSettledAmount    String?    
+  transactionId         String?   
+  tds                   String?    
+  deduction             String?    
+  settlementDate        DateTime? 
+  updatedDate           DateTime?  
   enhancements Enhancement[]
   comments    Comment[]
   documents   Document[]

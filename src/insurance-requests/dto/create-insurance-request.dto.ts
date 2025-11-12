@@ -16,7 +16,7 @@ class CreateDocumentInput {
     @ApiProperty({ enum: DocumentType, example: DocumentType.CLINIC_PAPER })
     @IsEnum(DocumentType)
     type: DocumentType;
-    
+
     @ApiPropertyOptional({ example: 'Final Bill...' })
     @IsOptional()
     @IsString()
@@ -75,25 +75,65 @@ export class CreateInsuranceRequestDto {
     @IsString()
     settlementSummary?: string;
 
-    @ApiPropertyOptional({ 
-        example: '85000.50', 
-        description: ' or 85000 no comma separated like 8,500' 
+    @ApiPropertyOptional({
+        example: '85000.50',
+        description: ' or 85000 no comma separated like 8,500'
     })
     @IsOptional()
     @IsString()
     settlementAmount?: string;
 
-    @ApiPropertyOptional({ 
-        example: '85000.50', 
-        description: ' or 85000 no comma separated like 8,500' 
+    @ApiPropertyOptional({
+        example: '85000.50',
+        description: ' or 85000 no comma separated like 8,500'
     })
     @IsOptional()
     @IsString()
     actualQuotedAmount?: string;
 
-    @ApiPropertyOptional({ 
-        example: true, 
-        description: 'this is needed when unassigned claim needs a basic update when triggered from pencil edit icon on DRAFT and PENDING status' 
+    @ApiPropertyOptional({ example: '100000', description: 'Total bill amount' })
+    @IsOptional()
+    @IsString()
+    totalBill?: string;
+
+    @ApiPropertyOptional({ example: '80000', description: 'Total approved amount' })
+    @IsOptional()
+    @IsString()
+    totalApproval?: string;
+
+    @ApiPropertyOptional({ example: '75000', description: 'Total settled amount' })
+    @IsOptional()
+    @IsString()
+    totalSettledAmount?: string;
+
+    @ApiPropertyOptional({ example: 'txn-123456789', description: 'Transaction ID' })
+    @IsOptional()
+    @IsString()
+    transactionId?: string;
+
+    @ApiPropertyOptional({ example: '500', description: 'Tax Deducted at Source (TDS)' })
+    @IsOptional()
+    @IsString()
+    tds?: string;
+
+    @ApiPropertyOptional({ example: '2000', description: 'Deduction amount' })
+    @IsOptional()
+    @IsString()
+    deduction?: string;
+
+    @ApiPropertyOptional({ example: '2023-10-01', description: 'Settlement date' })
+    @IsOptional()
+    @IsString() // You could also use Date if you need Date validation
+    settlementDate?: string;
+
+    @ApiPropertyOptional({ example: '2023-10-02', description: 'Date when the settlement was last updated' })
+    @IsOptional()
+    @IsString() // You could also use Date if you need Date validation
+    updatedDate?: string;
+
+    @ApiPropertyOptional({
+        example: true,
+        description: 'this is needed when unassigned claim needs a basic update when triggered from pencil edit icon on DRAFT and PENDING status'
     })
     @IsOptional()
     @IsBoolean()
