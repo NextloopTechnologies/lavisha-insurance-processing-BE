@@ -102,6 +102,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.QUERY_UPDATE,
     Permission.NOTIFICATION_READ_LIST,
     Permission.NOTIFICATION_MARK_READ,
+    Permission.USER_UPDATE,
   ],
   HOSPITAL_MANAGER: [
     Permission.USER_READ,
@@ -128,5 +129,6 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.QUERY_UPDATE,
     Permission.NOTIFICATION_READ_LIST,
     Permission.NOTIFICATION_MARK_READ,
+    Permission.USER_UPDATE,
   ],
 };
