@@ -1,0 +1,8 @@
+
+# Local
+# Ignore local environment files
+/node_modules
+.env
+dist
+
+/generated/prisma

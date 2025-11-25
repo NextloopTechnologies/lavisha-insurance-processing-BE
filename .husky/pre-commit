@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+npm test
+
+# Get current branch
+branch=$(git symbolic-ref --short HEAD)
+
+# Check if migrations are staged outside staging branch
+if [ "$branch" != "staging" ]; then
+  if git diff --cached --name-only | grep -q "^prisma/migrations/"; then
+    echo "❌ Migration files are not allowed outside 'staging' branch."
+    echo "✅ Use 'npx prisma db push --force-reset' on feature branches instead."
+    exit 1
+  fi
+fi

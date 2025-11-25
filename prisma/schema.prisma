@@ -1,0 +1,205 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // directUrl = env("DIRECT_URL") // Optional, for migrations
+}
+// Define your database models here
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  HOSPITAL_MANAGER
+  HOSPITAL
+}
+
+model User { 
+  id String @id @default(uuid()) 
+  email String @unique 
+  password String 
+  name String 
+  address String?
+  profileFileName String?
+  profileUrl String?
+  rateListFileName String?
+  rateListUrl String?
+  hospitalName String?
+  role Role
+  tokens String[] @default([])
+  createdAt DateTime @default(now()) 
+  updatedAt DateTime @updatedAt 
+
+  // Self relation: Managers belong to a hospital
+  hospitalId          String?   
+  hospital            User?     @relation("HospitalManagers", fields: [hospitalId], references: [id], onDelete: Cascade)
+  managers            User[]    @relation("HospitalManagers")
+
+  documents Document[]
+  comments Comment[]
+  notifications Notification[]
+  insuranceRequests InsuranceRequest[]
+  patients Patient[]
+  commentsForHospital Comment[] @relation("HospitalComments")
+} 
+
+model Patient {
+  id            String   @id @default(uuid())
+  name          String
+  age           Int
+  url           String?
+  fileName      String?
+  hospitalUserId String?
+  createdAt     DateTime @default(now())
+  hospital User? @relation(fields: [hospitalUserId], references: [id], onDelete: SetNull)
+  insuranceRequests InsuranceRequest[]
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  url         String?
+  fileName    String
+  type        DocumentType
+  remark      String?
+  uploadedBy  String?
+  insuranceRequestId String?
+  enhancementId String?
+  queryId String?
+  uploadedAt  DateTime @default(now())
+  uploader    User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id], onDelete: SetNull)
+  enhancement Enhancement? @relation(fields: [enhancementId], references: [id], onDelete: SetNull)
+  query Query? @relation(fields: [queryId], references: [id], onDelete: SetNull)
+}
+
+enum DocumentType {
+  ICP
+  CLINIC_PAPER
+  PAST_INVESTIGATION
+  CURRENT_INVESTIGATION
+  DIAGNOSTIC
+  ENHANCEMENT_ESTIMATE
+  DISCHARGE_SUMMARY
+  DISCHARGE_OTHER
+  SETTLEMENT_LETTER
+  SETTLEMENT_OTHER
+  EXCEL_REPORT
+  OTHER
+}
+
+model InsuranceRequest {
+  id          String   @id @default(uuid())
+  refNumber   String   @unique 
+  patientId   String
+  description String?
+  doctorName  String
+  isPreAuth   Boolean @default(false)
+  insuranceCompany String
+  tpaName     String
+  assignedTo  String?
+  status      ClaimStatus @default(PENDING)
+  additionalNotes String?
+  dischargeSummary String?
+  settlementSummary String? 
+  settlementAmount String?
+  actualQuotedAmount  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  enhancements Enhancement[]
+  comments    Comment[]
+  documents   Document[]
+  queries     Query[]
+  assignee     User?  @relation(fields: [assignedTo], references: [id])
+  patient     Patient  @relation(fields: [patientId], references: [id])
+}
+
+enum ClaimStatus {
+  PENDING
+  SENT_TO_TPA
+  DRAFT
+  QUERIED
+  APPROVED
+  DENIED
+  ENHANCEMENT
+  DISCHARGED
+  SETTLED
+}
+
+model Enhancement {
+  id                 String   @id @default(uuid())
+  insuranceRequestId String
+  numberOfDays       Int
+  doctorName         String?
+  raisedAt           DateTime @default(now())
+  respondedAt        DateTime?
+  notes              String?
+  dischargeSummary   String?
+  settlementSummary  String?
+  status             ClaimStatus @default(PENDING)
+  documents          Document[] 
+  queries            Query[]
+  insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+}
+
+model Query {
+  id                 String   @id @default(uuid())
+  insuranceRequestId String
+  enhancementId      String?
+  notes              String?
+  resolvedRemarks    String?
+  isResolved         Boolean  @default(false)
+  raisedAt           DateTime @default(now())
+  documents          Document[] 
+  insuranceRequest   InsuranceRequest @relation(fields: [insuranceRequestId], references: [id])
+  enhancement Enhancement? @relation(fields: [enhancementId], references: [id])
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  text        String
+  type        CommentType
+  insuranceRequestId String?
+  hospitalId  String?
+  fileUrl     String?
+  isRead      Boolean  @default(false)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  hospital    User?  @relation("HospitalComments", fields: [hospitalId], references: [id], onDelete: SetNull)
+  creator    User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  insuranceRequest InsuranceRequest? @relation(fields: [insuranceRequestId], references: [id])
+}
+
+enum CommentType {
+  NOTE
+  QUERY
+  TPA_REPLY
+  SYSTEM
+  HOSPITAL_NOTE
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String
+  message    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String
+  action      String
+  targetType  String
+  targetId    String
+  timestamp   DateTime @default(now())
+}
+
