@@ -115,7 +115,6 @@ model InsuranceRequest {
   updatedAt   DateTime @updatedAt
   totalBill             String?   
   totalApproval         String?   
-  totalSettledAmount    String?    
   transactionId         String?   
   tds                   String?    
   deduction             String?    
