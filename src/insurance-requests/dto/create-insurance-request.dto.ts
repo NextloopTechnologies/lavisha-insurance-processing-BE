@@ -101,11 +101,6 @@ export class CreateInsuranceRequestDto {
     @IsString()
     totalApproval?: string;
 
-    @ApiPropertyOptional({ example: '75000', description: 'Total settled amount' })
-    @IsOptional()
-    @IsString()
-    totalSettledAmount?: string;
-
     @ApiPropertyOptional({ example: 'txn-123456789', description: 'Transaction ID' })
     @IsOptional()
     @IsString()
@@ -129,12 +124,13 @@ export class CreateInsuranceRequestDto {
     @ApiPropertyOptional({ example: '2023-10-02', description: 'Date when the settlement was last updated' })
     @IsOptional()
     @IsString() // You could also use Date if you need Date validation
-    updatedDate?: string;
+    updatedSettlementDate?: string;
 
     @ApiPropertyOptional({
         example: true,
         description: 'this is needed when unassigned claim needs a basic update when triggered from pencil edit icon on DRAFT and PENDING status'
     })
+
     @IsOptional()
     @IsBoolean()
     isBasicClaimUpdate?: boolean;

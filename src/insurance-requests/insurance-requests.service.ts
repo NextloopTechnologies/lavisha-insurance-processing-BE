@@ -56,7 +56,7 @@ export class InsuranceRequestsService {
         refNumber,
         ...(isSettlement && {
           settlementDate: new Date(),
-          updatedDate: new Date()
+          updatedSettlementDate: new Date()
         })
       },
       include: {
@@ -320,12 +320,12 @@ export class InsuranceRequestsService {
       if (!rest?.settlementDate) {
         settlementData = {
           settlementDate: new Date(),
-          updatedDate: new Date()
+          updatedSettlementDate: new Date()
         };
       } else {
        
         settlementData = {
-          updatedDate: new Date()
+          updatedSettlementDate: new Date()
         };
       }
     }
