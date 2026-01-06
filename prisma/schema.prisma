@@ -119,7 +119,7 @@ model InsuranceRequest {
   tds                   String?    
   deduction             String?    
   settlementDate        DateTime? 
-  updatedDate           DateTime?  
+  updatedSettlementDate DateTime?  
   enhancements Enhancement[]
   comments    Comment[]
   documents   Document[]
