@@ -6,10 +6,10 @@ import { Comment, CommentType, Prisma, Role } from '@prisma/client';
 @Injectable()
 export class CommentsService {
     constructor(private prisma: PrismaService) {}
-    
-     async create(
+
+    async create(
         role: Role,
-        data: CreateCommentsDto, 
+        data: CreateCommentsDto,
         createdBy: string,
         loggedInUserHospitalId: string
     ): Promise<Comment> {
@@ -34,26 +34,31 @@ export class CommentsService {
             throw new BadRequestException(`${data.type} with insuranceRequestId both can't be used at same time.`)
         }
         if(rest.type === CommentType.NOTE || 
-        rest.type === CommentType.QUERY || 
-        rest.type === CommentType.TPA_REPLY) {
-            const insuranceRequest = await this.prisma.insuranceRequest.findUnique({ 
-                where: { id: insuranceRequestId } 
+            rest.type === CommentType.QUERY ||
+            rest.type === CommentType.TPA_REPLY) {
+            const insuranceRequest = await this.prisma.insuranceRequest.findUnique({
+                where: { id: insuranceRequestId }
             });
             if (!insuranceRequest) throw new BadRequestException('Invalid claim ID');
         }
-       
-        return await this.prisma.comment.create({ 
-          data : { 
-            hospital: { connect: { id: hospitalIdForCreateQuery }}, 
-            ...rest, 
-            ...(insuranceRequestId ? { insuranceRequest: { connect: { id: insuranceRequestId }}} : undefined), 
-            ...(insuranceRequestId && { isRead: true }),
-            creator: { connect: { id: createdBy }} 
-          }
+        const isRead = (
+            role === Role.HOSPITAL ||
+            role === Role.ADMIN ||
+            role === Role.SUPER_ADMIN ||
+            role === Role.HOSPITAL_MANAGER
+        ) ? false : true;
+        return await this.prisma.comment.create({
+            data: {
+                hospital: { connect: { id: hospitalIdForCreateQuery } },
+                ...rest,
+                ...(insuranceRequestId ? { insuranceRequest: { connect: { id: insuranceRequestId } } } : undefined),
+                ...(insuranceRequestId && { isRead: isRead }),
+                creator: { connect: { id: createdBy } }
+            }
         });
-      }
+    }
 
-    
+
     async findAll(params: {
         take?: number;
         cursor?: string;
@@ -62,9 +67,9 @@ export class CommentsService {
         role: Role,
         loggedInUserHospitalId: string
     }): Promise<Comment[]> {
-        const { 
-            cursor, take, where, 
-            currentUserId, role, 
+        const {
+            cursor, take, where,
+            currentUserId, role,
             loggedInUserHospitalId,
         } = params;
         const comments = await this.prisma.comment.findMany({
@@ -73,7 +78,7 @@ export class CommentsService {
             where,
             orderBy: { createdAt: 'desc' },
             include: {
-                creator: { select: { id: true, name: true, profileUrl: true } },
+                creator: { select: { id: true, name: true, profileUrl: true, role: true } },
             },
         })
         if(role === Role.HOSPITAL_MANAGER && loggedInUserHospitalId) {
@@ -96,7 +101,7 @@ export class CommentsService {
             select: { id: true }
         })
         if(!hospital) throw new BadRequestException("Invalid HospitalID!")
-        
+
         return await this.prisma.comment.updateMany({
             where: {
                 hospitalId,
@@ -172,4 +177,56 @@ export class CommentsService {
         // });
 
     }
+
+    // async markCommentsAsRead(insuranceRequestId: string): Promise<any> {
+    //     return this.prisma.comment.updateMany({
+    //         where: {
+    //             insuranceRequestId: insuranceRequestId,
+    //             isRead: false,
+    //         },
+    //         data: {
+    //             isRead: true,
+    //         },
+    //     });
+    // }
+    async markCommentsAsRead(params: {
+        userId: string;
+        role: Role;
+        insuranceRequestId: string;
+    }) {
+        const { insuranceRequestId, role, userId } = params;
+
+        if (!insuranceRequestId) {
+            throw new BadRequestException('insuranceRequestId is required');
+        }
+
+        // Define which comments should be marked as read
+        let whereCondition: Prisma.CommentWhereInput = {
+            insuranceRequestId,
+            isRead: false,
+            createdBy: { not: userId }, // Don't mark your own messages
+        };
+
+        // ✅ If Admin/SuperAdmin → mark hospital comments as read
+        if (role === Role.ADMIN || role === Role.SUPER_ADMIN) {
+            whereCondition.creator = { role: Role.HOSPITAL };
+        }
+
+        // ✅ If Hospital/Hospital Manager → mark admin/superadmin comments as read
+        else if (role === Role.HOSPITAL || role === Role.HOSPITAL_MANAGER) {
+            whereCondition.creator = { role: { in: [Role.ADMIN, Role.SUPER_ADMIN] } };
+        } else {
+            throw new BadRequestException(`Role ${role} not supported for this operation.`);
+        }
+
+        const updated = await this.prisma.comment.updateMany({
+            where: whereCondition,
+            data: { isRead: true },
+        });
+
+        return { updatedCount: updated.count };
+    }
+
+
+
 }
