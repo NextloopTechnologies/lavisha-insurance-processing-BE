@@ -12,7 +12,6 @@
     "baseUrl": "./",
     "incremental": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "types": ["jest", "node"]
+    "skipLibCheck": true
   }
 }
