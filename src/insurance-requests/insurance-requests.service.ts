@@ -35,9 +35,9 @@ export class InsuranceRequestsService {
     userName: string
   ): Promise<MutateResponseInsuranceRequestDto> {
     const { patientId, assignedTo, documents, ...rest } = data;
-    
+
     // notification to superadmin or default larisha admin  along with activity
-    const isSuperAdminExists = await this.prisma.user.findFirst({ 
+    const isSuperAdminExists = await this.prisma.user.findFirst({
       where: { role: Role.SUPER_ADMIN },
       select: { id: true }
     })
@@ -47,20 +47,24 @@ export class InsuranceRequestsService {
     if (!patient) throw new BadRequestException('Invalid patient ID');
 
     const refNumber = await this.generateClaimRefNumber();
-   
-    const createdClaim = await this.prisma.insuranceRequest.create({ 
-      data : { 
+    const isSettlement = rest.status === "SETTLED";
+    const createdClaim = await this.prisma.insuranceRequest.create({
+      data: {
         ...rest,
         // ...(assignedTo && { user: { connect: { id: assignedTo } } }),
-        patient: { connect: { id: patientId }}, 
-        refNumber 
+        patient: { connect: { id: patientId } },
+        refNumber,
+        ...(isSettlement && {
+          settlementDate: new Date(),
+          updatedSettlementDate: new Date()
+        })
       },
-      include: { 
-        patient: { select: { id: true, name: true, hospital: { select: { id: true }} }}
+      include: {
+        patient: { select: { id: true, name: true, hospital: { select: { id: true } } } }
       }
     });
 
-    if(!createdClaim) throw new BadRequestException("Failed to create claim!")
+    if (!createdClaim) throw new BadRequestException("Failed to create claim!")
     const patientHospitalId = createdClaim.patient.hospital.id
 
     // notify to super admin and hospital user
@@ -80,7 +84,7 @@ export class InsuranceRequestsService {
         notifiedTo: isSuperAdminExists.id
       })
     ])
-  
+
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
         ...document,
@@ -88,10 +92,10 @@ export class InsuranceRequestsService {
         insuranceRequestId: createdClaim.id,
         remark: document.remark ? document.remark : undefined
       })),
-      select: { id: true , insuranceRequestId: true , fileName: true , type: true }
+      select: { id: true, insuranceRequestId: true, fileName: true, type: true }
     })
 
-    if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
+    if (!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
 
     // notify and create comment for hospital and superadmin
     const notifyAndHistoryPayload = {
@@ -111,7 +115,7 @@ export class InsuranceRequestsService {
         notifiedTo: isSuperAdminExists.id
       })
     ])
-  
+
     return {
       id: createdClaim.id,
       refNumber: createdClaim.refNumber,
@@ -123,223 +127,272 @@ export class InsuranceRequestsService {
   }
 
   async findAll(params: {
-      skip?: number;
-      take?: number;
-      where?: Prisma.InsuranceRequestWhereInput;
-      orderBy?: Prisma.InsuranceRequestOrderByWithRelationInput;
-    }): Promise<PaginatedResult<InsuranceRequest>> {
-      const { skip, take, where, orderBy } = params;
-      const [total, data] = await this.prisma.$transaction([
-        this.prisma.insuranceRequest.count( { where}),
-        this.prisma.insuranceRequest.findMany({
-          skip,
-          take,
-          where,
-          orderBy,
-          include: {
-            patient: { select: { id: true, name: true }},
-            assignee: { select: { id: true, name: true }}
+    skip?: number;
+    take?: number;
+    where?: Prisma.InsuranceRequestWhereInput;
+    orderBy?: Prisma.InsuranceRequestOrderByWithRelationInput;
+  }): Promise<PaginatedResult<InsuranceRequest>> {
+    const { skip, take, where, orderBy } = params;
+    const [total, data] = await this.prisma.$transaction([
+      this.prisma.insuranceRequest.count({ where }),
+      this.prisma.insuranceRequest.findMany({
+        skip,
+        take,
+        where,
+        orderBy,
+        include: {
+          patient: { select: { id: true, name: true, hospital: { select: { id: true, name: true } } } },
+          assignee: { select: { id: true, name: true } }
+        }
+      })
+    ])
+    return { total, data }
+  }
+
+  async addPresignedUrls(docs: Document[]) {
+    return await Promise.all(
+      docs.map(async (doc) => ({
+        ...doc,
+        url: await this.fileService.getPresignedUrl(doc.fileName)
+      }))
+    );
+  }
+
+  async findOne(
+    insuranceRequestWhereUniqueInput: Prisma.InsuranceRequestWhereUniqueInput
+  ): Promise<InsuranceRequest | null> {
+    const insuranceRequest = await this.prisma.insuranceRequest.findUniqueOrThrow({
+      where: insuranceRequestWhereUniqueInput,
+      include: {
+        patient: { select: { id: true, name: true, hospital: { select: { id: true, name: true } } } },
+        assignee: { select: { id: true, name: true } },
+        documents: true,
+        queries: { include: { documents: true } },
+        enhancements: { include: { documents: true } }
+      },
+    });
+
+    if (insuranceRequest.documents?.length > 0) {
+      //keep only main claim documents and remove query,enhancements 
+      insuranceRequest.documents = insuranceRequest.documents.filter(
+        (doc) => !doc.enhancementId && !doc.queryId
+      );
+      insuranceRequest.documents = await this.addPresignedUrls(insuranceRequest.documents)
+    }
+
+    // Separate enhancement-linked queries from top-level ones
+    const enhancementQueryMap = new Map<string, any[]>();
+
+    if (insuranceRequest.queries.length > 0) {
+      //keep only main claim queries and remove enhancements  
+      insuranceRequest.queries = insuranceRequest.queries.filter((query) => {
+        if (query.enhancementId) {
+          const arr = enhancementQueryMap.get(query.enhancementId) || [];
+          arr.push(query);
+          enhancementQueryMap.set(query.enhancementId, arr);
+          return false; // remove from top-level
+        }
+        return true; // keep in top-level
+      });
+
+      for (const query of insuranceRequest.queries) {
+        if (query.documents.length > 0) {
+          query.documents = await this.addPresignedUrls(query.documents)
+        }
+      }
+    }
+
+    if (insuranceRequest.enhancements.length > 0) {
+      for (const enhancement of insuranceRequest.enhancements) {
+        if (enhancement.documents.length > 0) {
+          //filter query from enhancement documents
+          enhancement.documents = enhancement.documents.filter(
+            (doc) => !doc.queryId
+          );
+          enhancement.documents = await this.addPresignedUrls(enhancement.documents)
+        }
+
+        // Attach enhancement-specific queries
+        const queries = enhancementQueryMap.get(enhancement.id) || [];
+        for (const query of queries) {
+          if (query.documents.length > 0) {
+            query.documents = await this.addPresignedUrls(query.documents);
           }
+        }
+
+        // Inject the queries under each enhancement
+        (enhancement as any).queries = queries;
+      }
+    }
+    return insuranceRequest;
+  }
+
+  async assignClaim(params: {
+    where: Prisma.InsuranceRequestWhereUniqueInput,
+    data: AddAssigneeInsuranceRequestDto,
+    userId: string,
+    userName: string
+  }): Promise<Partial<InsuranceRequest>> {
+    const { where, data, userId, userName } = params
+    const { assignedTo: assigneeId } = data
+
+    const result = await this.prisma.insuranceRequest.update({
+      where,
+      data: {
+        assignee: { connect: { id: assigneeId } }
+      },
+      select: {
+        id: true, refNumber: true, assignedTo: true,
+        assignee: { select: { id: true, name: true } },
+        patient: { select: { hospitalUserId: true } }
+      }
+    })
+    if (result) {
+      // notify to claim hospital and its assignee
+      const notificationPayload = {
+        userId,
+        insuranceRequestId: result.id,
+        message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
+      }
+
+      await Promise.all([
+        await this.commonService.logInsuranceRequestNotification({
+          ...notificationPayload,
+          notifiedTo: assigneeId
+        }),
+        await this.commonService.logInsuranceRequestNotification({
+          ...notificationPayload,
+          notifiedTo: result.patient.hospitalUserId
         })
       ])
-      return { total, data } 
     }
-  
-    async addPresignedUrls(docs: Document[]) {
-      return await Promise.all(
-        docs.map(async (doc) => ({
-          ...doc,
-          url: await this.fileService.getPresignedUrl(doc.fileName)
-        }))
-      );
+    const { id, refNumber, assignedTo } = result
+    return {
+      id,
+      refNumber,
+      assignedTo
     }
+  }
 
-    async findOne(
-      insuranceRequestWhereUniqueInput: Prisma.InsuranceRequestWhereUniqueInput
-    ) : Promise<InsuranceRequest | null> {
-      const insuranceRequest = await this.prisma.insuranceRequest.findUniqueOrThrow({
-        where: insuranceRequestWhereUniqueInput,
-        include: {
-          patient: { select: { id: true, name: true, hospital: { select: { id: true, name: true }} } },
-          assignee: { select: { id: true, name: true }},
-          documents: true,
-          queries: { include: { documents: true }},
-          enhancements: { include: { documents: true }}
-        },
-      });
+  async update(params: {
+    where: Prisma.InsuranceRequestWhereUniqueInput,
+    data: UpdateInsuranceRequestDto,
+    uploadedBy: string,
+    userName: string
+  }): Promise<MutateResponseInsuranceRequestDto> {
 
-      if (insuranceRequest.documents?.length > 0) {
-        //keep only main claim documents and remove query,enhancements 
-        insuranceRequest.documents = insuranceRequest.documents.filter(
-          (doc) => !doc.enhancementId && !doc.queryId
-        );
-        insuranceRequest.documents = await this.addPresignedUrls(insuranceRequest.documents)
-      }
+    const { where, data, uploadedBy, userName } = params;
+    const { patientId, assignedTo, documents, isBasicClaimUpdate, ...rest } = data;
+    let updatedDocuments: DocumentResponseDto[] = []
+    let createdDocuments: DocumentResponseDto[] = []
+    let assigneeId: string;
 
-      // Separate enhancement-linked queries from top-level ones
-      const enhancementQueryMap = new Map<string, any[]>();
+    const claimExists = await this.prisma.insuranceRequest.findUnique({
+      where,
+      select: { id: true, assignedTo: true, status: true }
+    })
+    if (!claimExists) throw new BadRequestException('Invalid claim ID');
 
-      if (insuranceRequest.queries.length > 0) {
-        //keep only main claim queries and remove enhancements  
-        insuranceRequest.queries = insuranceRequest.queries.filter((query) => {
-          if (query.enhancementId) {
-            const arr = enhancementQueryMap.get(query.enhancementId) || [];
-            arr.push(query);
-            enhancementQueryMap.set(query.enhancementId, arr);
-            return false; // remove from top-level
-          }
-          return true; // keep in top-level
-        });
-
-        for (const query of insuranceRequest.queries) {
-          if (query.documents.length > 0) {
-            query.documents = await this.addPresignedUrls(query.documents)
-          }
-        }
-      }
-
-      if (insuranceRequest.enhancements.length > 0) {
-        for (const enhancement of insuranceRequest.enhancements) {
-          if (enhancement.documents.length > 0) {
-            //filter query from enhancement documents
-            enhancement.documents = enhancement.documents.filter(
-              (doc) => !doc.queryId
-            );
-            enhancement.documents = await this.addPresignedUrls(enhancement.documents)
-          }
-
-          // Attach enhancement-specific queries
-          const queries = enhancementQueryMap.get(enhancement.id) || [];
-          for (const query of queries) {
-            if (query.documents.length > 0) {
-              query.documents = await this.addPresignedUrls(query.documents);
-            }
-          }
-
-          // Inject the queries under each enhancement
-          (enhancement as any).queries = queries;
-        }
-      }
-      return insuranceRequest;
-    }
-
-    async assignClaim(params: {
-      where: Prisma.InsuranceRequestWhereUniqueInput,
-      data: AddAssigneeInsuranceRequestDto,
-      userId: string,
-      userName: string
-    }): Promise<Partial<InsuranceRequest>> {
-      const { where, data, userId, userName } = params
-      const { assignedTo: assigneeId } = data
-
-      const result = await this.prisma.insuranceRequest.update({
-        where,
-        data: {
-          assignee: { connect: { id: assigneeId }}
-        },
-        select: { 
-          id: true, refNumber: true, assignedTo: true, 
-          assignee: { select: { id: true, name: true }}, 
-          patient: { select: { hospitalUserId: true }} 
-        }
+    if (isBasicClaimUpdate) {
+      // if it is from basic claim edit without assignee
+      const isSuperAdminExists = await this.prisma.user.findFirst({
+        where: { role: Role.SUPER_ADMIN },
+        select: { id: true }
       })
-      if(result) { 
-        // notify to claim hospital and its assignee
-        const notificationPayload = {
-          userId,
-          insuranceRequestId: result.id,
-          message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
-        }
-
-        await Promise.all([
-          await this.commonService.logInsuranceRequestNotification({
-            ...notificationPayload,
-            notifiedTo: assigneeId
-          }),
-          await this.commonService.logInsuranceRequestNotification({
-            ...notificationPayload,
-            notifiedTo: result.patient.hospitalUserId
-          })
-        ])
-      }
-      const { id, refNumber, assignedTo } = result
-      return { 
-        id,
-        refNumber,
-        assignedTo
-      }
+      if (!isSuperAdminExists) throw new BadRequestException("No SuperAdmin found!")
+      assigneeId = isSuperAdminExists.id
+    } else {
+      if (!claimExists.assignedTo) throw new BadRequestException('Assign User first!');
+      assigneeId = claimExists.assignedTo
     }
+
+    if (patientId) {
+      const patient = await this.prisma.patient.findUnique({
+        where: { id: patientId },
+        select: { id: true }
+      });
+      if (!patient) throw new BadRequestException('Invalid patient ID');
+    }
+   
+    let settlementData: any = {};
     
-    async update(params: {
-      where: Prisma.InsuranceRequestWhereUniqueInput,
-      data: UpdateInsuranceRequestDto,
-      uploadedBy: string,
-      userName: string
-    }): Promise<MutateResponseInsuranceRequestDto> {
-  
-      const { where, data, uploadedBy, userName } = params;
-      const { patientId, assignedTo, documents, isBasicClaimUpdate, ...rest } = data;
-      let updatedDocuments: DocumentResponseDto[] = []
-      let createdDocuments: DocumentResponseDto[] = []
-      let assigneeId: string;
-
-      const claimExists = await this.prisma.insuranceRequest.findUnique({ 
-        where ,
-        select: { id: true, assignedTo: true, status: true } 
-      })
-      if(!claimExists) throw new BadRequestException('Invalid claim ID');
-
-      if(isBasicClaimUpdate) {
-        // if it is from basic claim edit without assignee
-        const isSuperAdminExists = await this.prisma.user.findFirst({ 
-          where: { role: Role.SUPER_ADMIN },
-          select: { id: true }
-        })
-        if (!isSuperAdminExists) throw new BadRequestException("No SuperAdmin found!")
-        assigneeId = isSuperAdminExists.id
+    if (rest?.status === "SETTLED") {
+      if (!rest?.settlementDate) {
+        settlementData = {
+          settlementDate: new Date(),
+          updatedSettlementDate: new Date()
+        };
       } else {
-        if(!claimExists.assignedTo) throw new BadRequestException('Assign User first!');
-        assigneeId = claimExists.assignedTo 
+       
+        settlementData = {
+          updatedSettlementDate: new Date()
+        };
       }
+    }
 
-      if (patientId) {
-        const patient = await this.prisma.patient.findUnique({
-          where: { id: patientId }, 
-          select: { id: true } 
-        });
-        if (!patient) throw new BadRequestException('Invalid patient ID');
-      }
+    const updatedClaim = await this.prisma.insuranceRequest.update({
+      where,
+      data: {
+        ...rest,
+        // ...(assignedTo && { user: { connect: { id: assignedTo } } }),
+        ...settlementData,
+        ...(patientId && { patient: { connect: { id: patientId } } })
+      },
+      include: {
+        patient: { select: { id: true, name: true, hospital: { select: { id: true } } } },
+      },
+    });
 
-      const updatedClaim = await this.prisma.insuranceRequest.update({
-        where,
-        data: {
-          ...rest,
-          // ...(assignedTo && { user: { connect: { id: assignedTo } } }),
-          ...(patientId && { patient: { connect: { id: patientId } } })
-        },
-        include: {
-          patient: { select: { id: true, name: true, hospital: { select: { id: true }}}},
-        },
-      });
+    if (!updatedClaim) throw new BadRequestException("Failed to update claim!")
+    const patientHospitalId = updatedClaim.patient.hospital.id
 
-      if(!updatedClaim) throw new BadRequestException("Failed to update claim!")
-      const patientHospitalId = updatedClaim.patient.hospital.id
+    await this.commonService.logActivity(
+      uploadedBy,
+      `${userName} updated claim ${updatedClaim.refNumber}`,
+      "InsuranceRequest",
+      updatedClaim.id,
+    );
 
-      await this.commonService.logActivity(
-        uploadedBy,
-        `${userName} updated claim ${updatedClaim.refNumber}`,
-        "InsuranceRequest",
-        updatedClaim.id,
-      );
+    // notify and create comment for hospital and assignee
+    const notifyAndHistoryPayload = {
+      userId: uploadedBy,
+      insuranceRequestId: updatedClaim.id
+    }
 
-      // notify and create comment for hospital and assignee
-      const notifyAndHistoryPayload = {
-        userId: uploadedBy,
-        insuranceRequestId: updatedClaim.id
-      }
+    if (data.status && claimExists.status !== data.status) {
+      const message = `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`
+      await Promise.all([
+        await this.commonService.logInsuranceRequestChange({
+          ...notifyAndHistoryPayload,
+          notifiedTo: assigneeId,
+          hospitalId: patientHospitalId,
+          message
+        }),
+        await this.commonService.logInsuranceRequestNotification({
+          ...notifyAndHistoryPayload,
+          notifiedTo: patientHospitalId,
+          message
+        })
+      ])
+    }
 
-      if(data.status && claimExists.status !== data.status){
-        const message = `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`
+    if (documents?.length) {
+      const newDocs = documents.filter(doc => !doc.id);
+      const existingDocs = documents.filter(doc => doc.id);
+
+      if (newDocs?.length) {
+        createdDocuments = await this.prisma.document.createManyAndReturn({
+          data: newDocs.map((document) => ({
+            ...document,
+            uploadedBy,
+            insuranceRequestId: updatedClaim.id,
+            remark: document.remark ? document.remark : undefined
+          })),
+          select: { id: true, insuranceRequestId: true, fileName: true, type: true }
+        })
+
+        if (!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
+        const message = `${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`
         await Promise.all([
           await this.commonService.logInsuranceRequestChange({
             ...notifyAndHistoryPayload,
@@ -355,105 +408,73 @@ export class InsuranceRequestsService {
         ])
       }
 
-      if(documents?.length){
-        const newDocs = documents.filter(doc => !doc.id);
-        const existingDocs = documents.filter(doc => doc.id);
-  
-        if(newDocs?.length){
-          createdDocuments = await this.prisma.document.createManyAndReturn({
-            data: newDocs.map((document) => ({
-              ...document,
-              uploadedBy,
-              insuranceRequestId: updatedClaim.id,
-              remark: document.remark ? document.remark : undefined
-            })),
-            select: { id: true , insuranceRequestId: true , fileName: true , type: true }
+      if (existingDocs?.length) {
+        updatedDocuments = await Promise.all(
+          existingDocs.map(async doc => {
+            const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
+            if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+
+            return this.prisma.document.update({
+              where: { id: doc.id },
+              data: {
+                fileName: doc.fileName,
+                type: doc.type,
+                uploadedBy,
+                remark: doc.remark ? doc.remark : undefined
+              },
+              select: { id: true, insuranceRequestId: true, fileName: true, type: true }
+            });
           })
-      
-          if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
-          const message = `${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`
-          await Promise.all([
-            await this.commonService.logInsuranceRequestChange({
-              ...notifyAndHistoryPayload,
-              notifiedTo: assigneeId,
-              hospitalId: patientHospitalId,
-              message
-            }),
-            await this.commonService.logInsuranceRequestNotification({
-              ...notifyAndHistoryPayload,
-              notifiedTo: patientHospitalId,
-              message
-            })
-          ])
-        }
+        );
+        if (!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
 
-        if(existingDocs?.length){
-          updatedDocuments = await Promise.all(
-            existingDocs.map(async doc => {
-              const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
-              if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
-    
-              return this.prisma.document.update({
-                where: { id: doc.id },
-                data: {
-                  fileName: doc.fileName,
-                  type: doc.type,
-                  uploadedBy,
-                  remark: doc.remark ? doc.remark : undefined
-                },
-                select: { id: true , insuranceRequestId: true , fileName: true , type: true }
-              });
-            })
-          );
-          if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
-
-          const message = `${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`
-          await Promise.all([
-            await this.commonService.logInsuranceRequestChange({
-              ...notifyAndHistoryPayload,
-              notifiedTo: assigneeId,
-              hospitalId: patientHospitalId,
-              message
-            }),
-            await this.commonService.logInsuranceRequestNotification({
-              ...notifyAndHistoryPayload,
-              notifiedTo: patientHospitalId,
-              message
-            })
-          ])
-        }
+        const message = `${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`
+        await Promise.all([
+          await this.commonService.logInsuranceRequestChange({
+            ...notifyAndHistoryPayload,
+            notifiedTo: assigneeId,
+            hospitalId: patientHospitalId,
+            message
+          }),
+          await this.commonService.logInsuranceRequestNotification({
+            ...notifyAndHistoryPayload,
+            notifiedTo: patientHospitalId,
+            message
+          })
+        ])
       }
-
-      return {
-        id: updatedClaim.id,
-        refNumber: updatedClaim.refNumber,
-        doctorName: updatedClaim.doctorName,
-        tpaName: updatedClaim.tpaName,
-        insuranceCompany: updatedClaim.insuranceCompany,
-        documents: documents?.length ? [...createdDocuments, ...updatedDocuments]: undefined
-      };
     }
-  
+
+    return {
+      id: updatedClaim.id,
+      refNumber: updatedClaim.refNumber,
+      doctorName: updatedClaim.doctorName,
+      tpaName: updatedClaim.tpaName,
+      insuranceCompany: updatedClaim.insuranceCompany,
+        documents: documents?.length ? [...createdDocuments, ...updatedDocuments]: undefined
+    };
+  }
+
     async remove(refNumber: string): Promise<InsuranceRequest>{
-      const isStatusClaimDraft = await this.prisma.insuranceRequest.findFirst({
-        where: { refNumber, status: ClaimStatus.DRAFT },
+    const isStatusClaimDraft = await this.prisma.insuranceRequest.findFirst({
+      where: { refNumber, status: ClaimStatus.DRAFT },
         select: { id: true, documents: { select: { fileName: true }} }
-      })
+    })
 
       if(!isStatusClaimDraft) throw new BadRequestException("Claim not found or not a draft claim!")
 
       const [delDocuments, delInsuranceRequest] =  await this.prisma.$transaction([
         this.prisma.document.deleteMany({ where: { insuranceRequestId: isStatusClaimDraft.id }}),
-        this.prisma.insuranceRequest.delete({ where: { refNumber } })
-      ])
-      try {
+      this.prisma.insuranceRequest.delete({ where: { refNumber } })
+    ])
+    try {
         if(delDocuments.count>0) {
-          const docsToBeDeletedFromS3 = isStatusClaimDraft.documents.map(doc => doc.fileName)
-          await this.fileService.deleteMultipleFiles(docsToBeDeletedFromS3)
-        }
-      } catch (error) {
-        console.error("FROM_INSURANCE_REQUEST_DELETE_S3: ", error)  
+        const docsToBeDeletedFromS3 = isStatusClaimDraft.documents.map(doc => doc.fileName)
+        await this.fileService.deleteMultipleFiles(docsToBeDeletedFromS3)
       }
-      return delInsuranceRequest
+    } catch (error) {
+      console.error("FROM_INSURANCE_REQUEST_DELETE_S3: ", error)
     }
+    return delInsuranceRequest
+  }
 }
