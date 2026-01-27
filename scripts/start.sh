@@ -1,9 +1,27 @@
 #!/bin/bash
 
+set -e
+
+BASE_DIR="/home/ec2-user/workspace"
+ENVIRONMENT=${CODEPIPELINE_VARIABLE_DEPLOY_ENV:-dev}
+
+if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
+  echo "Invalid DEPLOY_ENV: $ENVIRONMENT"
+  exit 1
+fi
+
+if [ "$ENVIRONMENT" = "prod" ]; then
+  APP_DIR="$BASE_DIR/lavisha-prod"
+else
+  APP_DIR="$BASE_DIR/lavisha-dev"
+fi
+
 export NVM_DIR="/home/ec2-user/.nvm"
 source "$NVM_DIR/nvm.sh"
 
-cd /home/ec2-user/workspace/lavisha-dev
+# cd /home/ec2-user/workspace/lavisha-dev
+echo "using app directory: $APP_DIR"
+cd $APP_DIR
 
 #npm install
 # Only when new packages are added
