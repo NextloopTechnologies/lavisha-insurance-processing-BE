@@ -57,5 +57,5 @@ npm run build
 #   echo "dist/ already exists. Skipping build."
 # fi
 
-pm2 delete lavisha-dev 2>/dev/null
-pm2 start dist/src/main.js --name lavisha-dev 
+pm2 delete lavisha-$ENVIRONMENT 2>/dev/null
+pm2 start dist/src/main.js --name lavisha-$ENVIRONMENT
