@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ec2-user/workspace
+    destination: /home/ec2-user/workspace/lavisha
 hooks:
   AfterInstall:
     - location: scripts/start.sh
