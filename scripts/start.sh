@@ -14,7 +14,7 @@ cp package-lock.json last-install.lock
 # else
 #   echo "No dependency changes."
 # fi
-
+npm run build
 # use SKIP_DB_SETUP
 echo "Running db:setup..."
 npm run db:setup
