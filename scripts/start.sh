@@ -1,10 +1,22 @@
 #!/bin/bash
 set -e  # Exit on any error immediately
 
+set -e
+
+APP_DIR="/home/ec2-user/workspace/lavisha"
+ENVIRONMENT=${CODEPIPELINE_VARIABLE_DEPLOY_ENV:-dev}
+
+if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
+  echo "Invalid DEPLOY_ENV: $ENVIRONMENT"
+  exit 1
+fi
+
 export NVM_DIR="/home/ec2-user/.nvm"
 source "$NVM_DIR/nvm.sh"
 
-cd /home/ec2-user/workspace/lavisha-dev
+# cd /home/ec2-user/workspace/lavisha-dev
+echo "using app directory: $APP_DIR"
+cd $APP_DIR
 
 # ─── Load environment variables ───────────────────────────────────────────────
 if [ -f .env ]; then
@@ -60,4 +72,5 @@ echo "Restarting pm2 app..."
 pm2 delete lavisha-dev 2>/dev/null || true
 pm2 start dist/src/main.js --name lavisha-dev
 
-echo "Deploy complete!"
+pm2 delete lavisha-$ENVIRONMENT 2>/dev/null
+pm2 start dist/src/main.js --name lavisha-$ENVIRONMENT
