@@ -1,21 +1,9 @@
 #!/bin/bash
 
-set -e
-
-APP_DIR="/home/ec2-user/workspace/lavisha"
-ENVIRONMENT=${CODEPIPELINE_VARIABLE_DEPLOY_ENV:-dev}
-
-if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
-  echo "Invalid DEPLOY_ENV: $ENVIRONMENT"
-  exit 1
-fi
-
 export NVM_DIR="/home/ec2-user/.nvm"
 source "$NVM_DIR/nvm.sh"
 
-# cd /home/ec2-user/workspace/lavisha-dev
-echo "using app directory: $APP_DIR"
-cd $APP_DIR
+cd /home/ec2-user/workspace/lavisha-dev
 
 #npm install
 # Only when new packages are added
@@ -43,7 +31,7 @@ if (( $(echo "$load > $cpu_count" | bc -l) )); then
   exit 1
 fi
 
-npm run build
+ npm run build
 # if [ ! -d "dist" ]; then
 #   echo "No dist directory. Running build..."
 #   npm run build
@@ -51,5 +39,5 @@ npm run build
 #   echo "dist/ already exists. Skipping build."
 # fi
 
-pm2 delete lavisha-$ENVIRONMENT 2>/dev/null
-pm2 start dist/src/main.js --name lavisha-$ENVIRONMENT
+pm2 delete lavisha-dev 2>/dev/null
+pm2 start dist/src/main.js --name lavisha-dev 
