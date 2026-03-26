@@ -4,6 +4,10 @@ files:
   - source: /
     destination: /home/ec2-user/workspace/lavisha
 hooks:
+  BeforeInstall:
+    - location: scripts/fix_permissions.sh
+      timeout: 300
+      runas: root
   AfterInstall:
     - location: scripts/start.sh
       runas: ec2-user
