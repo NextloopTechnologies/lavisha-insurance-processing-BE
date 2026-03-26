@@ -9,7 +9,7 @@ if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "stg" && "$ENVIRONMENT" != "p
   exit 1
 fi
 
-APP_DIR="/home/ec2-user/workspace/lavisha-$ENVIRONMENT"
+APP_DIR="/home/ec2-user/workspace/lavisha"
 
 # export NVM_DIR="/home/ec2-user/.nvm"
 # source "$NVM_DIR/nvm.sh"
