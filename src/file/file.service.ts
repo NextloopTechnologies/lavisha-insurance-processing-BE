@@ -7,22 +7,24 @@ import { s3 } from 'src/common/utils/s3.util';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3FileUploadResult } from 'src/common/interfaces/s3.interface';
 import { compressImage, compressPdf } from 'src/common/utils/compress.utils';
-
+import { PrismaService } from 'src/prisma/prisma.service';
 @Injectable()
 export class FileService {
 
+    constructor(private readonly prisma: PrismaService) { }
+
     async uploadFile(
-        file: Express.Multer.File, 
+        file: Express.Multer.File,
         folder: string
     ): Promise<S3FileUploadResult> {
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
             throw new BadRequestException(`Invalid file type. Only the following types are allowed: ${ALLOWED_MIME_TYPES}`);
         }
-        
+
         if (file.size > MAX_FILE_SIZE) {
             throw new BadRequestException(`File too large, Max: ${(MAX_FILE_SIZE/1024)/1024} MB` );
         }
-        
+
         const fileExt = extname(file.originalname);
         const fileName = `${folder}${randomUUID()}${fileExt}`;
         let buffer = file.buffer;
@@ -32,7 +34,7 @@ export class FileService {
         } else if (file.mimetype.startsWith('image/')) {
             buffer = await compressImage(buffer, file.mimetype);
         }
-        
+
         await s3.send(new PutObjectCommand({
             Bucket: process.env.AWS_BUCKET_NAME,
             Key: fileName,
@@ -43,9 +45,9 @@ export class FileService {
         const isProfile = folder.startsWith('profiles/');
 
         const url = isProfile
-        ? `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`
-        : undefined
-        
+            ? `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`
+            : undefined
+
         return {
             key: fileName,
             ...(url ? { url } : {}),
@@ -53,14 +55,14 @@ export class FileService {
     }
 
     async uploadMultipleFiles(
-        files: Express.Multer.File[], 
+        files: Express.Multer.File[],
         folder: string
     ): Promise<S3FileUploadResult[]>  {
         return Promise.all(files.map(file => this.uploadFile(file, folder)));
     }
-    
+
     async getPresignedUrl(
-        key: string, 
+        key: string,
         expiresInSeconds = 10800
     ): Promise<string> {
         const command = new GetObjectCommand({
@@ -84,10 +86,17 @@ export class FileService {
         keys: string[]
     ): Promise<DeleteObjectsCommandOutput> {
         const objects = keys.map(k => ({ Key: k }));
-        return s3.send(new DeleteObjectsCommand({
+        const s3Result = await s3.send(new DeleteObjectsCommand({
             Bucket: process.env.AWS_BUCKET_NAME,
             Delete: { Objects: objects },
         }));
+
+        // Delete matching rows from the Document table
+        await this.prisma.document.deleteMany({
+            where: { fileName: { in: keys } },
+        });
+
+        return s3Result;
     }
 }
 
