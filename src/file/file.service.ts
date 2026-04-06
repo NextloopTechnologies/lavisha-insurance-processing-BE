@@ -26,7 +26,14 @@ export class FileService {
         }
 
         const fileExt = extname(file.originalname);
-        const fileName = `${folder}${randomUUID()}${fileExt}`;
+        const safeName = file.originalname
+        .replace(fileExt, '')           // remove extension
+        .replace(/[^a-zA-Z0-9_-]/g, '_') // sanitize special chars/spaces
+        .substring(0, 50);               // limit length
+
+        //  key = folder/originalName_UUID.ext
+       const fileName = `${folder}${safeName}_${randomUUID()}${fileExt}`;
+        // const fileName = `${folder}${randomUUID()}${fileExt}`;
         let buffer = file.buffer;
 
         if (file.mimetype === 'application/pdf') {
