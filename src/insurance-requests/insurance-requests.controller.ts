@@ -42,7 +42,7 @@ export class InsuranceRequestsController {
     const { userId, role, hospitalId } = req.user
     const { skip, take, sortBy, sortOrder, 
       refNumber, doctorName, insuranceCompany, tpaName, assigneeName,
-      patientName, status, createdFrom, createdTo
+      patientName,hospitalName,status, createdFrom, createdTo
     } = query;
     let hospitalUserId:string
 
@@ -50,13 +50,22 @@ export class InsuranceRequestsController {
     else if(role===Role.HOSPITAL_MANAGER) hospitalUserId = hospitalId
 
     const where: Prisma.InsuranceRequestWhereInput = {};
+
     if(![Role.SUPER_ADMIN, Role.ADMIN].includes(role)) where.patient = { hospitalUserId }
-    if (refNumber) where.refNumber = { contains: refNumber, mode: 'insensitive' };
+
+      if (patientName || hospitalName || refNumber) {
+      where.OR = [
+        ...(refNumber    ? [{ refNumber: { contains: refNumber, mode: 'insensitive' as const } }] : []),
+        ...(patientName  ? [{ patient: { name: { contains: patientName, mode: 'insensitive' as const } } }] : []),
+        ...(hospitalName ? [{ patient: { hospital: { name: { contains: hospitalName, mode: 'insensitive' as const } } } }] : []),
+      ]
+    }
+    // if (refNumber) where.refNumber = { contains: refNumber, mode: 'insensitive' };
     if (doctorName) where.doctorName = { contains: doctorName, mode: 'insensitive' };
     if (insuranceCompany) where.insuranceCompany = { contains: insuranceCompany, mode: 'insensitive' };
     if (tpaName) where.tpaName = { contains: tpaName, mode: 'insensitive' };
     if (assigneeName) where.assignee = { name: { contains: assigneeName, mode: 'insensitive' }};
-    if (patientName) where.patient = { name: { contains: patientName, mode: 'insensitive' }};
+    // if (patientName) where.patient = { name: { contains: patientName, mode: 'insensitive' }};
     if (status  && status.length > 0) where.status = { in: status };
     if (createdFrom || createdTo) {
       where.createdAt = {
