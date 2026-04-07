@@ -7,6 +7,7 @@ import { s3 } from 'src/common/utils/s3.util';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3FileUploadResult } from 'src/common/interfaces/s3.interface';
 import { compressImage, compressPdf } from 'src/common/utils/compress.utils';
+import multer from 'multer';
 import { PrismaService } from 'src/prisma/prisma.service';
 @Injectable()
 export class FileService {

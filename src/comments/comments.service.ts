@@ -43,8 +43,8 @@ export class CommentsService {
         }
         const isRead = (
             role === Role.HOSPITAL ||
-            role === Role.ADMIN ||
-            role === Role.SUPER_ADMIN ||
+            // role === Role.ADMIN ||
+            // role === Role.SUPER_ADMIN ||
             role === Role.HOSPITAL_MANAGER
         ) ? false : true;
         return await this.prisma.comment.create({
@@ -130,52 +130,123 @@ export class CommentsService {
         return { count }
     }
 
-    async listHospitalsWithManagerComments() {
-        const latestComments: Comment[] = await this.prisma.$queryRaw`
-            SELECT DISTINCT ON ("hospitalId") c."id", c."text", c."type", c."hospitalId", c."createdAt",
-                    h."name" as "hospitalName",
-                    u."name" as "creatorName",
-                    u."profileUrl",
-                    (
-                        SELECT COUNT(*) 
-                        FROM "Comment" c2
-                        WHERE c2."hospitalId" = c."hospitalId" 
-                            AND c2."type" = 'HOSPITAL_NOTE'
-                            AND c2."isRead" = false
-                    )::int AS "unreadCount"
-            FROM "Comment" c
-            LEFT JOIN "User" h ON h."id" = c."hospitalId"
-            LEFT JOIN "User" u ON u."id" = c."createdBy"
-            WHERE c."type" = 'HOSPITAL_NOTE'
-            ORDER BY c."hospitalId", c."createdAt" DESC
-        `;
-        // make global sorting desc for comment list
-        return latestComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        // Get latest comment timestamp per hospital
-        // const latestPerHospital = await this.prisma.comment.groupBy({
-        //     by: ['hospitalId'],
-        //     where: { type: 'HOSPITAL_NOTE' },
-        //     _max: { createdAt: true }
-        // });
-        // return await this.prisma.comment.findMany({
-        //     where: {
-        //         type: 'HOSPITAL_NOTE',
-        //         OR: latestPerHospital.map(l => ({
-        //         hospitalId: l.hospitalId,
-        //         createdAt: l._max.createdAt
-        //         }))
-        //     },
-        //     select: {
-        //         id: true,
-        //         text: true,
-        //         type: true,
-        //         hospitalId: true,
-        //         hospital: { select: { id: true, name: true }},
-        //         creator: { select: { id: true, name: true }}
-        //     },
-        //     orderBy: { createdAt: 'desc' }
-        // });
+    // async listHospitalsWithManagerComments() {
+    //     // const latestComments: Comment[] = await this.prisma.$queryRaw`
+    //     //     SELECT DISTINCT ON ("hospitalId") c."id", c."text", c."type", c."hospitalId", c."createdAt",
+    //     //             h."name" as "hospitalName",
+    //     //             u."name" as "creatorName",
+    //     //             u."profileUrl",
+    //     //             (
+    //     //                 SELECT COUNT(*) 
+    //     //                 FROM "Comment" c2
+    //     //                 WHERE c2."hospitalId" = c."hospitalId" 
+    //     //                     AND c2."type" = 'HOSPITAL_NOTE'
+    //     //                     AND c2."isRead" = false
+    //     //             )::int AS "unreadCount"
+    //     //     FROM "Comment" c
+    //     //     LEFT JOIN "User" h ON h."id" = c."hospitalId"
+    //     //     LEFT JOIN "User" u ON u."id" = c."createdBy"
+    //     //     WHERE c."type" = 'HOSPITAL_NOTE'
+    //     //     ORDER BY c."hospitalId", c."createdAt" DESC
+    //     // `;
 
+    //      const latestComments = await this.prisma.$queryRaw`
+    //     SELECT DISTINCT ON (c."hospitalId") 
+    //         c."id",
+    //         c."text",
+    //         c."type",
+    //         c."hospitalId",
+    //         c."createdAt",
+    //         h."name" AS "hospitalName",
+    //         u."name" AS "creatorName",
+    //         u."profileUrl",
+    //         (
+    //             SELECT COUNT(*) 
+    //             FROM "Comment" c2
+    //             INNER JOIN "User" u2 ON u2."id" = c2."createdBy"
+    //             WHERE c2."hospitalId" = c."hospitalId"
+    //               AND c2."type" = 'HOSPITAL_NOTE'
+    //               AND c2."isRead" = false
+    //               AND u2."role" = 'HOSPITAL_MANAGER'  -- only count unread manager comments
+    //         )::int AS "unreadCount"
+    //     FROM "Comment" c
+    //     LEFT JOIN "User" h ON h."id" = c."hospitalId"
+    //     LEFT JOIN "User" u ON u."id" = c."createdBy"
+    //     WHERE c."type" = 'HOSPITAL_NOTE'
+    //     ORDER BY c."hospitalId", c."createdAt" DESC
+    // `;
+    //     // make global sorting desc for comment list
+    //     return latestComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    //     // Get latest comment timestamp per hospital
+    //     // const latestPerHospital = await this.prisma.comment.groupBy({
+    //     //     by: ['hospitalId'],
+    //     //     where: { type: 'HOSPITAL_NOTE' },
+    //     //     _max: { createdAt: true }
+    //     // });
+    //     // return await this.prisma.comment.findMany({
+    //     //     where: {
+    //     //         type: 'HOSPITAL_NOTE',
+    //     //         OR: latestPerHospital.map(l => ({
+    //     //         hospitalId: l.hospitalId,
+    //     //         createdAt: l._max.createdAt
+    //     //         }))
+    //     //     },
+    //     //     select: {
+    //     //         id: true,
+    //     //         text: true,
+    //     //         type: true,
+    //     //         hospitalId: true,
+    //     //         hospital: { select: { id: true, name: true }},
+    //     //         creator: { select: { id: true, name: true }}
+    //     //     },
+    //     //     orderBy: { createdAt: 'desc' }
+    //     // });
+
+    // }
+
+    async listHospitalsWithManagerComments() {
+        type HospitalComment = {
+            id: string;
+            text: string;
+            type: string;
+            hospitalId: string;
+            createdAt: string;
+            hospitalName: string;
+            creatorName: string;
+            profileUrl: string | null;
+            unreadCount: number;
+        };
+
+        const latestComments: HospitalComment[] = await this.prisma.$queryRaw<HospitalComment[]>`
+    SELECT DISTINCT ON (c."hospitalId") 
+        c."id",
+        c."text",
+        c."type",
+        c."hospitalId",
+        c."createdAt",
+        h."name" AS "hospitalName",
+        u."name" AS "creatorName",
+        u."profileUrl",
+        (
+            SELECT COUNT(*) 
+            FROM "Comment" c2
+            INNER JOIN "User" u2 ON u2."id" = c2."createdBy"
+            WHERE c2."hospitalId" = c."hospitalId"
+              AND c2."type" = 'HOSPITAL_NOTE'
+              AND c2."isRead" = false
+              AND u2."role" = 'HOSPITAL_MANAGER'
+        )::int AS "unreadCount"
+    FROM "Comment" c
+    LEFT JOIN "User" h ON h."id" = c."hospitalId"
+    LEFT JOIN "User" u ON u."id" = c."createdBy"
+    WHERE c."type" = 'HOSPITAL_NOTE'
+    ORDER BY c."hospitalId", c."createdAt" DESC
+  `;
+
+        // global sort: newest comment first
+        return latestComments.sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
     }
 
     // async markCommentsAsRead(insuranceRequestId: string): Promise<any> {
