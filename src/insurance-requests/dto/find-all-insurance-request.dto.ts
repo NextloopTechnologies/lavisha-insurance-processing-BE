@@ -60,4 +60,9 @@ export class FindAllInsuranceRequestDto extends PaginationDto {
     @IsOptional()
     @IsDateString()
     createdTo?: string;
+
+    @ApiPropertyOptional({ example: 'larisha hospital' })
+    @IsOptional()
+    @IsString()
+    hospitalName?: string; 
 }
