@@ -50,16 +50,12 @@ async function waitForDatabase(): Promise<void> {
 
 async function runMigrations(): Promise<void> {
   try {
-     if (process.env.SKIP_DB_SETUP !== 'true') {
       console.log('🧩 Applying Prisma migrations...');
       execSync('npx prisma migrate deploy', { stdio: 'inherit' });
       console.log('✅ Migrations applied successfully.');
       console.log('🧩 Applying Prisma generate...');
       execSync('npx prisma generate', { stdio: 'inherit' });
       console.log('✅ Prisma Generate successfull.');
-    } else {
-      console.log('⏭️ Skipping DB setup & DB gnerate as SKIP_DB_SETUP=true');
-    }
   } catch (err) {
     console.error('❌ Failed to run Prisma migrations:', err);
     process.exit(1);
@@ -67,7 +63,15 @@ async function runMigrations(): Promise<void> {
 }
 
 async function main() {
-  await waitForDatabase();
+   if (process.env.SKIP_DB_SETUP === 'true') {
+    console.log('Skipping DB setup completely as SKIP_DB_SETUP=true...');
+    return;
+  }
+
+  if (process.env.DB_TYPE === 'local') {
+    await waitForDatabase();
+  }
+
   await runMigrations();
 }
 
