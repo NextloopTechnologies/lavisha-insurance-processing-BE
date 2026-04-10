@@ -3,27 +3,35 @@ import 'dotenv/config';
 import { execSync } from 'child_process';
 import { Client } from 'pg';
 
-const { DB_USER, DB_NAME, DB_PASSWORD } = process.env;
+const { DB_USER, DB_NAME, DB_PASSWORD, DB_TYPE } = process.env;
+const dbType = (DB_TYPE || 'local').toLowerCase()
 
-if (!DB_USER || !DB_NAME || !DB_PASSWORD) {
-  throw new Error('Missing required environment variables for db config.');
+function localDBConfig() {
+  if (!DB_USER || !DB_NAME || !DB_PASSWORD) {
+    throw new Error('Missing required environment variables for local DB config.');
+  }
+  const DB_CONFIG = {
+    user: process.env.DB_USER!,
+    host: process.env.DB_HOST!,
+    database: process.env.DB_NAME!,
+    password: process.env.DB_PASSWORD!,
+    port: parseInt(process.env.DB_PORT! || '5432', 10),
+  };
+  return new Client(DB_CONFIG);
 }
 
-const DB_CONFIG = {
-  user: process.env.DB_USER!,
-  host: process.env.DB_HOST!,
-  database: process.env.DB_NAME!,
-  password: process.env.DB_PASSWORD!,
-  port: parseInt(process.env.DB_PORT! || '5432', 10),
-};
-
 async function waitForDatabase(): Promise<void> {
-  const client = new Client(DB_CONFIG);
-
+  if (dbType === 'cloud') {
+    console.log('Skipping DB wait (cloud mode)...');
+    return;
+  }
+ 
   console.log('⏳ Waiting for PostgreSQL to be ready...');
 
-  let retries = 30;
+  const MAX_RETRIES = 5;
+  let retries = MAX_RETRIES;
   while (retries > 0) {
+    const client = localDBConfig();
     try {
       await client.connect();
       await client.end();
@@ -31,8 +39,8 @@ async function waitForDatabase(): Promise<void> {
       return;
     } catch (err) {
       retries--;
-      console.log(`Retrying... (${30 - retries}/30)`);
-      await new Promise((res) => setTimeout(res, 2000));
+      console.log(`Retrying... (${MAX_RETRIES - retries}/MAX_RETRIES)`);
+      await new Promise((res) => setTimeout(res, 1500));
     }
   }
 
