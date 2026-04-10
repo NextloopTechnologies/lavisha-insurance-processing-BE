@@ -26,6 +26,18 @@ export class UsersService {
         if (existingUser) throw new BadRequestException('Email already in use');
         
         const hashedPassword = await bcrypt.hash(data.password, 10);
+            if (data.role === Role.HOSPITAL_MANAGER) {
+            const exists = await this.prisma.user.findFirst({
+                where: {
+                    hospitalId: data.hospitalId,
+                    role: Role.HOSPITAL_MANAGER,
+                },
+            });
+
+                if (exists) {
+                    throw new BadRequestException('Manager already exists for this hospital');
+                }
+         }
         return await this.prisma.user.create({
             data: {
                 ...rest,
