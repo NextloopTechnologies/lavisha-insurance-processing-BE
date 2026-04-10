@@ -42,6 +42,10 @@ cp package-lock.json last-install.lock
 #   echo "No dependency changes."
 # fi
 
+
+rm -rf dist
+npm run build 
+
 # use SKIP_DB_SETUP
 echo "Running db:setup..."
 npm run db:setup
@@ -58,7 +62,7 @@ if (( $(echo "$load > $cpu_count" | bc -l) )); then
   exit 1
 fi
 
- npm run build
+#  npm run build
 # if [ ! -d "dist" ]; then
 #   echo "No dist directory. Running build..."
 #   npm run build
