@@ -43,7 +43,7 @@ cp package-lock.json last-install.lock
 # fi
 
 
-rm -rf dist
+# rm -rf dist
 npm run build 
 
 # use SKIP_DB_SETUP
@@ -57,7 +57,7 @@ npm run db:seed
 cpu_count=$(nproc)
 load=$(uptime | awk -F'load average: ' '{ print $2 }' | cut -d, -f1 | xargs)
 
-if (( $(echo "$load > $cpu_count" | bc -l) )); then
+if (( $(echo "$load > ($cpu_count * 2)" | bc -l) )); then
   echo "CPU load is high ($load). Skipping build."
   exit 1
 fi
