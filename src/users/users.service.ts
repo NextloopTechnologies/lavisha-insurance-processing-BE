@@ -20,13 +20,7 @@ export class UsersService {
         data: CreateUserDto
     ): Promise<MutateUserResponseDto> {
         const { hospitalId, rateListFileName, ...rest } = data
-        const existingUser = await this.prisma.user.findUnique({
-            where: { email: data.email.toLowerCase() },
-        });
-        if (existingUser) throw new BadRequestException('Email already in use');
-        
-        const hashedPassword = await bcrypt.hash(data.password, 10);
-            if (data.role === Role.HOSPITAL_MANAGER) {
+         if (data.role === Role.HOSPITAL_MANAGER) {
             const exists = await this.prisma.user.findFirst({
                 where: {
                     hospitalId: data.hospitalId,
@@ -38,6 +32,13 @@ export class UsersService {
                     throw new BadRequestException('Manager already exists for this hospital');
                 }
          }
+        const existingUser = await this.prisma.user.findUnique({
+            where: { email: data.email.toLowerCase() },
+        });
+        if (existingUser) throw new BadRequestException('Email already in use');
+        
+        const hashedPassword = await bcrypt.hash(data.password, 10);
+           
         return await this.prisma.user.create({
             data: {
                 ...rest,
