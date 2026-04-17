@@ -37,24 +37,29 @@ export class PatientsController {
     return this.patientsService.create(createPatientDto, hospitalUserId);
   }
 
-  @Get('dropdown')
-  @Permissions(Permission.PATIENT_LIST)
-  @ApiOperation({ summary: 'Dropdown list of patients (id & name)' })
-  @ApiQuery({ name: 'search', required: false, example: 'john' })
-  findDropdown(
-    @Request() req,
-    @Query('search') search?: string
-  ): Promise<{ id: string; name: string }[]> {
+@Get('dropdown')
+@Permissions(Permission.PATIENT_LIST)
+@ApiOperation({ summary: 'Dropdown list of patients (id & name)' })
+@ApiQuery({ name: 'search', required: false, example: 'john' })
+@ApiQuery({ name: 'hospitalId', required: false, example: 'uuid' })
+findDropdown(
+  @Request() req,
+  @Query('search') search?: string,
+  @Query('hospitalId') hospitalIdFromQuery?: string
+): Promise<{ id: string; name: string }[]> {
     const { userId: currentUserId, role, hospitalId } = req.user
-    let hospitalUserId:string
+      let hospitalUserId:string | undefined;
+
 
     if(role===Role.HOSPITAL) hospitalUserId = currentUserId
     else if(role===Role.HOSPITAL_MANAGER) {
       if(!hospitalId) throw new BadRequestException(`${role} should have hospitalId`)
       hospitalUserId = hospitalId
-    }
-    return this.patientsService.findDropdown(hospitalUserId, search);
+    }else if (role === Role.ADMIN || role === Role.SUPER_ADMIN) {
+     hospitalUserId = hospitalIdFromQuery; 
   }
+  return this.patientsService.findDropdown(hospitalUserId, search);
+}
 
   @Get()
   @Permissions(Permission.PATIENT_LIST)
