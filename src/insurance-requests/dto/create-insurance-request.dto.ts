@@ -126,6 +126,26 @@ export class CreateInsuranceRequestDto {
     @IsString() // You could also use Date if you need Date validation
     updatedSettlementDate?: string;
 
+    @ApiPropertyOptional({ example: '2023-10-01', description: 'Date of patient admission (manually selected)' })
+    @IsOptional()
+    @IsString()
+    dateOfAdmission?: string;
+
+    @ApiPropertyOptional({ example: '2023-10-10', description: 'Date of patient discharge (manually selected via discharge modal)' })
+    @IsOptional()
+    @IsString()
+    dateOfDischarge?: string;
+
+    @ApiPropertyOptional({ example: 'Acute Appendicitis', description: 'Diagnosis details' })
+    @IsOptional()
+    @IsString()
+    diagnosis?: string;
+
+    @ApiPropertyOptional({ example: '50000', description: 'Provisional amount (no comma separated)' })
+    @IsOptional()
+    @IsString()
+    provisionalAmount?: string;
+
     @ApiPropertyOptional({
         example: true,
         description: 'this is needed when unassigned claim needs a basic update when triggered from pencil edit icon on DRAFT and PENDING status'
