@@ -37,7 +37,7 @@ export class PatientsController {
     return this.patientsService.create(createPatientDto, hospitalUserId);
   }
 
-@Get('dropdown')
+  @Get('dropdown')
 @Permissions(Permission.PATIENT_LIST)
 @ApiOperation({ summary: 'Dropdown list of patients (id & name)' })
 @ApiQuery({ name: 'search', required: false, example: 'john' })
