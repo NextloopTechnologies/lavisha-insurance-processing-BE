@@ -93,6 +93,7 @@ enum DocumentType {
   SETTLEMENT_OTHER
   EXCEL_REPORT
   OTHER
+  PRE_AUTH
 }
 
 model InsuranceRequest {
