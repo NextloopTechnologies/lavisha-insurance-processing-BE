@@ -16,7 +16,7 @@ export class InsuranceRequestsService {
     private prisma: PrismaService,
     private fileService: FileService,
     private readonly commonService: CommonService
-  ) {}
+  ) { }
 
   private async generateClaimRefNumber(): Promise<string> {
     const lastClaim = await this.prisma.insuranceRequest.findFirst({
@@ -27,6 +27,18 @@ export class InsuranceRequestsService {
     const lastNumber = lastClaim?.refNumber?.split('-')[1];
     const next = lastNumber ? parseInt(lastNumber) + 1 : 1;
     return `CLM-${String(next).padStart(5, '0')}`;
+  }
+
+  private async addPresignedUrlsToHospital(hospital: { id: string; name: string; rateListFileNames: string[] }) {
+    if (!hospital?.rateListFileNames?.length) {
+      return { ...hospital, rateListUrls: [] };
+    }
+    const rateListUrls = await Promise.all(
+      hospital.rateListFileNames.map((fileName) =>
+        this.fileService.getPresignedUrl(fileName)
+      )
+    );
+    return { ...hospital, rateListUrls };
   }
 
   async create(
@@ -133,7 +145,7 @@ export class InsuranceRequestsService {
     orderBy?: Prisma.InsuranceRequestOrderByWithRelationInput;
   }): Promise<PaginatedResult<InsuranceRequest>> {
     const { skip, take, where, orderBy } = params;
-    const [total, data] = await this.prisma.$transaction([
+    const [total, rawData] = await this.prisma.$transaction([
       this.prisma.insuranceRequest.count({ where }),
       this.prisma.insuranceRequest.findMany({
         skip,
@@ -141,12 +153,32 @@ export class InsuranceRequestsService {
         where,
         orderBy,
         include: {
-          patient: { select: { id: true, name: true, hospital: { select: { id: true, name: true } } } },
+          patient: {
+            select: {
+              id: true,
+              name: true,
+              hospital: { select: { id: true, name: true, rateListFileNames: true } }
+            }
+          },
           assignee: { select: { id: true, name: true } }
         }
       })
-    ])
-    return { total, data }
+    ]);
+
+    const data = await Promise.all(
+      rawData.map(async (claim) => {
+        if (claim.patient?.hospital) {
+          const hospitalWithUrls = await this.addPresignedUrlsToHospital(claim.patient.hospital as any);
+          return {
+            ...claim,
+            patient: { ...claim.patient, hospital: hospitalWithUrls }
+          };
+        }
+        return claim;
+      })
+    );
+
+    return { total, data: data as InsuranceRequest[] };
   }
 
   async addPresignedUrls(docs: Document[]) {
@@ -164,13 +196,26 @@ export class InsuranceRequestsService {
     const insuranceRequest = await this.prisma.insuranceRequest.findUniqueOrThrow({
       where: insuranceRequestWhereUniqueInput,
       include: {
-        patient: { select: { id: true, name: true, hospital: { select: { id: true, name: true } } } },
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            hospital: { select: { id: true, name: true, rateListFileNames: true } }
+          }
+        },
         assignee: { select: { id: true, name: true } },
         documents: true,
         queries: { include: { documents: true } },
         enhancements: { include: { documents: true } }
       },
     });
+
+    // Generate presigned URLs for hospital rate list files
+    if (insuranceRequest.patient?.hospital) {
+      (insuranceRequest.patient.hospital as any) = await this.addPresignedUrlsToHospital(
+        insuranceRequest.patient.hospital as any
+      );
+    }
 
     if (insuranceRequest.documents?.length > 0) {
       //keep only main claim documents and remove query,enhancements 
@@ -313,9 +358,9 @@ export class InsuranceRequestsService {
       });
       if (!patient) throw new BadRequestException('Invalid patient ID');
     }
-   
+
     let settlementData: any = {};
-    
+
     if (rest?.status === "SETTLED") {
       if (!rest?.settlementDate) {
         settlementData = {
@@ -323,7 +368,7 @@ export class InsuranceRequestsService {
           updatedSettlementDate: new Date()
         };
       } else {
-       
+
         settlementData = {
           updatedSettlementDate: new Date()
         };
@@ -451,24 +496,24 @@ export class InsuranceRequestsService {
       doctorName: updatedClaim.doctorName,
       tpaName: updatedClaim.tpaName,
       insuranceCompany: updatedClaim.insuranceCompany,
-        documents: documents?.length ? [...createdDocuments, ...updatedDocuments]: undefined
+      documents: documents?.length ? [...createdDocuments, ...updatedDocuments] : undefined
     };
   }
 
-    async remove(refNumber: string): Promise<InsuranceRequest>{
+  async remove(refNumber: string): Promise<InsuranceRequest> {
     const isStatusClaimDraft = await this.prisma.insuranceRequest.findFirst({
       where: { refNumber, status: ClaimStatus.DRAFT },
-        select: { id: true, documents: { select: { fileName: true }} }
+      select: { id: true, documents: { select: { fileName: true } } }
     })
 
-      if(!isStatusClaimDraft) throw new BadRequestException("Claim not found or not a draft claim!")
+    if (!isStatusClaimDraft) throw new BadRequestException("Claim not found or not a draft claim!")
 
-      const [delDocuments, delInsuranceRequest] =  await this.prisma.$transaction([
-        this.prisma.document.deleteMany({ where: { insuranceRequestId: isStatusClaimDraft.id }}),
+    const [delDocuments, delInsuranceRequest] = await this.prisma.$transaction([
+      this.prisma.document.deleteMany({ where: { insuranceRequestId: isStatusClaimDraft.id } }),
       this.prisma.insuranceRequest.delete({ where: { refNumber } })
     ])
     try {
-        if(delDocuments.count>0) {
+      if (delDocuments.count > 0) {
         const docsToBeDeletedFromS3 = isStatusClaimDraft.documents.map(doc => doc.fileName)
         await this.fileService.deleteMultipleFiles(docsToBeDeletedFromS3)
       }
