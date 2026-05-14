@@ -19,8 +19,8 @@ export class UsersService {
     async create(
         data: CreateUserDto
     ): Promise<MutateUserResponseDto> {
-        const { hospitalId, rateListFileName, ...rest } = data
-         if (data.role === Role.HOSPITAL_MANAGER) {
+        const { hospitalId, rateListFileNames, ...rest } = data
+        if (data.role === Role.HOSPITAL_MANAGER) {
             const exists = await this.prisma.user.findFirst({
                 where: {
                     hospitalId: data.hospitalId,
@@ -28,24 +28,24 @@ export class UsersService {
                 },
             });
 
-                if (exists) {
-                    throw new BadRequestException('Manager already exists for this hospital');
-                }
-         }
+            if (exists) {
+                throw new BadRequestException('Manager already exists for this hospital');
+            }
+        }
         const existingUser = await this.prisma.user.findUnique({
             where: { email: data.email.toLowerCase() },
         });
         if (existingUser) throw new BadRequestException('Email already in use');
-        
+
         const hashedPassword = await bcrypt.hash(data.password, 10);
-           
+
         return await this.prisma.user.create({
             data: {
                 ...rest,
                 email: data.email.toLowerCase(),
                 password: hashedPassword,
-                ...(hospitalId && { hospital: { connect: { id: hospitalId }}}),
-                ...((data.role===Role.HOSPITAL && rateListFileName) && { rateListFileName })
+                ...(hospitalId && { hospital: { connect: { id: hospitalId } } }),
+                ...((data.role === Role.HOSPITAL && rateListFileNames?.length) && { rateListFileNames })
             },
             select: {
                 id: true,
@@ -53,9 +53,8 @@ export class UsersService {
                 email: true,
                 address: true,
                 hospitalName: true,
-                rateListFileName: true,
-                rateListUrl: true,
-                hospital: { select: { id: true, name: true }},
+                rateListFileNames: true,
+                hospital: { select: { id: true, name: true } },
                 role: true,
             }
         });
@@ -76,7 +75,7 @@ export class UsersService {
         });
         const result = data
             .filter(value => value.role !== Role.SUPER_ADMIN)
-      
+
         return result
     }
 
@@ -87,7 +86,7 @@ export class UsersService {
         orderBy?: Prisma.UserOrderByWithRelationInput;
     }): Promise<PaginatedResult<MutateUserResponseDto>> {
         const { skip, take, where, orderBy } = params;
-        const [total, data] = await this.prisma.$transaction([
+        const [total, rawData] = await this.prisma.$transaction([
             this.prisma.user.count({ where }),
             this.prisma.user.findMany({
                 skip,
@@ -100,11 +99,27 @@ export class UsersService {
                     email: true,
                     address: true,
                     hospitalName: true,
-                    hospital: { select: { id: true, name: true }},
+                    rateListFileNames: true,
+                    hospital: { select: { id: true, name: true } },
                     role: true,
                 }
             })
-        ])
+        ]);
+
+        const data = await Promise.all(
+            rawData.map(async (user) => {
+                if (user.role === Role.HOSPITAL && user.rateListFileNames?.length) {
+                    const rateListUrls = await Promise.all(
+                        user.rateListFileNames.map((fileName) =>
+                            this.fileService.getPresignedUrl(fileName)
+                        )
+                    );
+                    return { ...user, rateListUrls };
+                }
+                return { ...user, rateListUrls: [] };
+            })
+        );
+
         return { total, data }
     }
 
@@ -121,19 +136,24 @@ export class UsersService {
                 hospitalName: true,
                 profileFileName: true,
                 profileUrl: true,
-                rateListFileName: true,
-                rateListUrl: true,
-                hospital: { select: { id: true, name: true }},
+                rateListFileNames: true,
+                hospital: { select: { id: true, name: true } },
                 role: true,
             }
-        })
-        let rateListUrl: string;
-        if(result.role===Role.HOSPITAL && result.rateListFileName){
-            rateListUrl = await this.fileService.getPresignedUrl(result.rateListFileName);
+        });
+
+        let rateListUrls: string[] = [];
+        if (result.role === Role.HOSPITAL && result.rateListFileNames?.length) {
+            rateListUrls = await Promise.all(
+                result.rateListFileNames.map((fileName) =>
+                    this.fileService.getPresignedUrl(fileName)
+                )
+            );
         }
+
         return {
             ...result,
-            rateListUrl: rateListUrl ? rateListUrl : null
+            rateListUrls,
         }
     }
 
@@ -142,19 +162,22 @@ export class UsersService {
         data: UpdateUserDto
     }): Promise<MutateUserResponseDto> {
         const { where, data } = params;
-        const { email, password, hospitalId, ...rest } = data
-         const isSuperAdminUser = await this.prisma.user.findFirst({
-            where: { 
+        const { email, password, hospitalId, rateListFileNames, ...rest } = data;
+
+        const isSuperAdminUser = await this.prisma.user.findFirst({
+            where: {
                 id: where.id,
                 role: Role.SUPER_ADMIN
             }
-        })
-        if(isSuperAdminUser) throw new BadRequestException("SUPERADMIN role can't be modified!")
-        return this.prisma.user.update({ 
-            data: { 
+        });
+        if (isSuperAdminUser) throw new BadRequestException("SUPERADMIN role can't be modified!");
+
+        return this.prisma.user.update({
+            data: {
                 ...rest,
-                ...(hospitalId && { hospital: { connect: { id: hospitalId }}})
-            }, 
+                ...(hospitalId && { hospital: { connect: { id: hospitalId } } }),
+                ...(rateListFileNames !== undefined && { rateListFileNames })
+            },
             where,
             select: {
                 id: true,
@@ -162,12 +185,11 @@ export class UsersService {
                 email: true,
                 address: true,
                 hospitalName: true,
-                rateListFileName: true,
-                rateListUrl: true,
-                hospital: { select: { id: true, name: true }},
+                rateListFileNames: true,
+                hospital: { select: { id: true, name: true } },
                 role: true,
             }
-        })
+        });
     }
 
     async forgotPassword(
@@ -177,16 +199,16 @@ export class UsersService {
         const userExists = await this.prisma.user.findUnique({
             where,
             select: { id: true }
-        })
-        if(!userExists) throw new BadRequestException("Invalid User!!")
+        });
+        if (!userExists) throw new BadRequestException("Invalid User!!");
 
-        const { password, confirmPassword } = data
-        if(password!==confirmPassword) throw new BadRequestException("Password Mismatched!")
+        const { password, confirmPassword } = data;
+        if (password !== confirmPassword) throw new BadRequestException("Password Mismatched!");
         const hashedPassword = await bcrypt.hash(password, 10);
         return this.prisma.user.update({
             where,
             data: { password: hashedPassword }
-        })
+        });
     }
 
     async remove(
@@ -205,18 +227,19 @@ export class UsersService {
                 name: true,
                 email: true,
                 profileFileName: true,
-                rateListFileName: true,
+                rateListFileNames: true,
                 role: true,
             }
-        })
-        const { profileFileName, rateListFileName} = result
+        });
+
+        const { profileFileName, rateListFileNames } = result;
         try {
-            if(profileFileName) await this.fileService.deleteFile(profileFileName)
-            if(rateListFileName) await this.fileService.deleteFile(rateListFileName)
+            if (profileFileName) await this.fileService.deleteFile(profileFileName);
+            if (rateListFileNames?.length) await this.fileService.deleteMultipleFiles(rateListFileNames);
         } catch (error) {
-            console.error("USER_DELETE_SERVICE_S3: ", error)
+            console.error("USER_DELETE_SERVICE_S3: ", error);
         }
 
-        return result
+        return result;
     }
 }
