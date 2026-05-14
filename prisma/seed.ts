@@ -62,7 +62,8 @@ async function main() {
             name: 'Larisha Hospital',
             hospitalName: "Larisha Hospital",
             address: "141, Uptown Hill, Santancruz MH",
-            rateListFileNames: ["hospitals/sample.pdf"],            role: Role.HOSPITAL,
+            rateListFileNames: ["hospitals/sample.pdf"],
+            role: Role.HOSPITAL,
         },
     });
 
