@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { ClaimStatus, DocumentType } from "@prisma/client";
-import { Type } from "class-transformer";
-import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
 
 class CreateDocumentInput {
     @ApiPropertyOptional({ example: 'doc-uuid' })
@@ -128,12 +128,14 @@ export class CreateInsuranceRequestDto {
 
     @ApiPropertyOptional({ example: '2023-10-01', description: 'Date of patient admission (manually selected)' })
     @IsOptional()
-    @IsString()
+    @Transform(({ value }) => value === '' ? undefined : value)
+    @IsDateString()
     dateOfAdmission?: string;
 
     @ApiPropertyOptional({ example: '2023-10-10', description: 'Date of patient discharge (manually selected via discharge modal)' })
     @IsOptional()
-    @IsString()
+    @Transform(({ value }) => value === '' ? undefined : value)
+    @IsDateString()
     dateOfDischarge?: string;
 
     @ApiPropertyOptional({ example: 'Acute Appendicitis', description: 'Diagnosis details' })
