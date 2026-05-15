@@ -1,10 +1,11 @@
+import { IsArray, ArrayNotEmpty } from 'class-validator';
 import { IsEmail, IsEnum, IsIn, IsOptional, IsString, MinLength, ValidateIf } from 'class-validator';
 import { Role } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateUserDto {
-    @ApiProperty({ 
-        example: 'hospital-user-uuid', 
+    @ApiProperty({
+        example: 'hospital-user-uuid',
         required: false,
         description: 'Required if role is HOSPITAL_MANAGER'
     })
@@ -45,14 +46,19 @@ export class CreateUserDto {
     @IsString()
     address?: string;
 
-    @ApiProperty({ 
-        example: 'hospitals/fileName.pdf',
-        required: false,
-        description: 'Required if role is HOSPITAL'
+    @ApiProperty({
+    example: [
+        'hospitals/sample.pdf',
+        'hospitals/icp.pdf'
+    ],
+    required: false,
+    description: 'Required if role is HOSPITAL'
     })
     @ValidateIf(o => o.role === Role.HOSPITAL)
-    @IsString({ message: 'rateListFileName must be provided if role is HOSPITAL' })
-    rateListFileName?: string;
+    @IsArray({ message: 'rateListFileNames must be an array' })
+    // @ArrayNotEmpty({ message: 'At least one rate list file is required' })
+    @IsString({ each: true, message: 'Each file name must be a string' })
+    rateListFileNames?: string[];
 
     @ApiProperty({ enum: Role, example: Role.HOSPITAL })
     @IsEnum(Role)

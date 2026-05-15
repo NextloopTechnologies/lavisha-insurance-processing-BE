@@ -28,13 +28,13 @@ export class MutateUserResponseDto {
 
     @ApiProperty({ example: 'hospitals/fileName.pdf' })
     @IsString()
-    rateListFileName?: string;
+    rateListFileNames?: string[];
 
     @ApiProperty({ example: 'https://files.example.com/hospitals/fileName.pdf' })
     @IsString()
-    rateListUrl?: string;
+    rateListUrls?: string[];
 
     @ApiProperty({ enum: Role, example: Role.HOSPITAL })
     @IsEnum(Role)
-    role: Role; 
+    role: Role;
 }

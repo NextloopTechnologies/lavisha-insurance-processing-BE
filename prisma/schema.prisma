@@ -30,7 +30,7 @@ model User {
   address String?
   profileFileName String?
   profileUrl String?
-  rateListFileName String?
+  rateListFileNames String[] @default([])
   rateListUrl String?
   hospitalName String?
   role Role
