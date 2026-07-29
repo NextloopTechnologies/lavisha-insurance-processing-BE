@@ -1,9 +1,15 @@
-
-# Local
-# Ignore local environment files
-/node_modules
-dist
-
-/generated/prisma
+
+
+# Local
+
+# Ignore local environment files
+
+/node_modules
+
+dist
+
+
+
+/generated/prisma
+
 config.bat
-.env
