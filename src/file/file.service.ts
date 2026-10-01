@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from 'src/common/constants/file.constants';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
-import { DeleteObjectCommand, DeleteObjectCommandOutput, DeleteObjectsCommand, DeleteObjectsCommandOutput, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, DeleteObjectCommandOutput, DeleteObjectsCommand, DeleteObjectsCommandOutput, GetObjectCommand, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getHospitalScope, RequestUser } from 'src/common/utils/access.utils';
+
+const OWNER_SCOPE_METADATA_KEY = 'owner-scope';
+const ADMIN_OWNER_SCOPE = 'admin';
 import { s3 } from 'src/common/utils/s3.util';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3FileUploadResult } from 'src/common/interfaces/s3.interface';
@@ -15,7 +19,8 @@ export class FileService {
 
     async uploadFile(
         file: Express.Multer.File,
-        folder: string
+        folder: string,
+        uploader: RequestUser
     ): Promise<S3FileUploadResult> {
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
             throw new BadRequestException(`Invalid file type. Only the following types are allowed: ${ALLOWED_MIME_TYPES}`);
@@ -46,7 +51,9 @@ export class FileService {
             Bucket: process.env.AWS_BUCKET_NAME,
             Key: fileName,
             Body: buffer,
-            ContentType: file.mimetype
+            ContentType: file.mimetype,
+            // records which hospital uploaded the object; checked on delete
+            Metadata: { [OWNER_SCOPE_METADATA_KEY]: getHospitalScope(uploader) ?? ADMIN_OWNER_SCOPE }
         }));
 
         const isProfile = folder.startsWith('profiles/');
@@ -63,9 +70,59 @@ export class FileService {
 
     async uploadMultipleFiles(
         files: Express.Multer.File[],
-        folder: string
+        folder: string,
+        uploader: RequestUser
     ): Promise<S3FileUploadResult[]>  {
-        return Promise.all(files.map(file => this.uploadFile(file, folder)));
+        return Promise.all(files.map(file => this.uploadFile(file, folder, uploader)));
+    }
+
+    /**
+     * Admins may delete any file. Hospital-level users may delete a file only if
+     * their hospital uploaded it, or it is attached to one of their own records.
+     */
+    async assertCanDeleteFiles(keys: string[], user: RequestUser): Promise<void> {
+        const scope = getHospitalScope(user);
+        if (!scope) return;
+
+        for (const key of keys) {
+            if (await this.getOwnerScope(key) === scope) continue;
+            if (await this.isFileReferencedByScope(key, scope, user.userId)) continue;
+            throw new ForbiddenException(`Not allowed to delete file: ${key}`);
+        }
+    }
+
+    private async getOwnerScope(key: string): Promise<string | undefined> {
+        try {
+            const head = await s3.send(new HeadObjectCommand({
+                Bucket: process.env.AWS_BUCKET_NAME,
+                Key: key,
+            }));
+            return head.Metadata?.[OWNER_SCOPE_METADATA_KEY];
+        } catch {
+            // missing object or file uploaded before ownership tagging
+            return undefined;
+        }
+    }
+
+    private async isFileReferencedByScope(key: string, scope: string, userId: string): Promise<boolean> {
+        const [document, patient, user] = await Promise.all([
+            this.prisma.document.findFirst({
+                where: { fileName: key, insuranceRequest: { patient: { hospitalUserId: scope } } },
+                select: { id: true }
+            }),
+            this.prisma.patient.findFirst({
+                where: { fileName: key, hospitalUserId: scope },
+                select: { id: true }
+            }),
+            this.prisma.user.findFirst({
+                where: {
+                    id: { in: [scope, userId] },
+                    OR: [{ profileFileName: key }, { rateListFileNames: { has: key } }]
+                },
+                select: { id: true }
+            }),
+        ]);
+        return Boolean(document || patient || user);
     }
 
     async getPresignedUrl(

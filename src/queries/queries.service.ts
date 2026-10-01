@@ -18,13 +18,20 @@ export class QueriesService {
   async create(
     data: CreateQueryDto,
     uploadedBy: string,
-    userName: string
+    userName: string,
+    hospitalScope?: string
   ): Promise<MutateQueryResponseDto> {
     const { insuranceRequestId, enhancementId, documents, resolvedRemarks, isResolved, ...rest } = data;
     if(resolvedRemarks || isResolved) throw new BadRequestException("Resolved details can't be added on create!")
 
-    const claim = await this.prisma.insuranceRequest.findUnique({ where: { id: insuranceRequestId } });
+    const claim = await this.prisma.insuranceRequest.findFirst({
+      where: { id: insuranceRequestId, ...(hospitalScope && { patient: { hospitalUserId: hospitalScope } }) }
+    });
     if (!claim) throw new BadRequestException('Invalid claim ID');
+    if (enhancementId) {
+      const enhancement = await this.prisma.enhancement.findFirst({ where: { id: enhancementId, insuranceRequestId } });
+      if (!enhancement) throw new BadRequestException('Invalid enhancement ID');
+    }
     
     const createdQuery = await this.prisma.query.create({ 
       data : { 
@@ -115,17 +122,21 @@ export class QueriesService {
     where: Prisma.QueryWhereUniqueInput,
     data: UpdateQueryDto,
     uploadedBy: string,
-    userName: string
+    userName: string,
+    hospitalScope?: string
   }): Promise<MutateQueryResponseDto> {
 
-    const { where, data, uploadedBy, userName } = params;
+    const { where, data, uploadedBy, userName, hospitalScope } = params;
     const { documents, insuranceRequestId, enhancementId, ...rest } = data;
     let updatedDocuments: DocumentResponseDto[] = []
     let createdDocuments: DocumentResponseDto[] = []
 
-    const queryExists = await this.prisma.query.findUnique({ 
-      where ,
-      select: { id: true } 
+    const queryExists = await this.prisma.query.findFirst({
+      where: {
+        id: where.id,
+        ...(hospitalScope && { insuranceRequest: { patient: { hospitalUserId: hospitalScope } } })
+      },
+      select: { id: true }
     })
     if(!queryExists) throw new BadRequestException('Invalid query ID');
 
@@ -220,7 +231,9 @@ export class QueriesService {
         updatedDocuments = await Promise.all(
           existingDocs.map(async doc => {
             const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
-            if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+            if (!existing || existing.queryId !== updatedQuery.id) {
+              throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+            }
 
             return this.prisma.document.update({
               where: { id: doc.id },

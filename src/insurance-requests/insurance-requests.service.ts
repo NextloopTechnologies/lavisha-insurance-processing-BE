@@ -44,7 +44,8 @@ export class InsuranceRequestsService {
   async create(
     data: CreateInsuranceRequestDto,
     uploadedBy: string,
-    userName: string
+    userName: string,
+    hospitalScope?: string
   ): Promise<MutateResponseInsuranceRequestDto> {
     const { patientId, assignedTo, documents, ...rest } = data;
 
@@ -55,7 +56,9 @@ export class InsuranceRequestsService {
     })
     if (!isSuperAdminExists) throw new BadRequestException("No SuperAdmin found!")
 
-    const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
+    const patient = await this.prisma.patient.findFirst({
+      where: { id: patientId, ...(hospitalScope && { hospitalUserId: hospitalScope }) }
+    });
     if (!patient) throw new BadRequestException('Invalid patient ID');
 
     const refNumber = await this.generateClaimRefNumber();
@@ -323,10 +326,11 @@ export class InsuranceRequestsService {
     where: Prisma.InsuranceRequestWhereUniqueInput,
     data: UpdateInsuranceRequestDto,
     uploadedBy: string,
-    userName: string
+    userName: string,
+    hospitalScope?: string
   }): Promise<MutateResponseInsuranceRequestDto> {
 
-    const { where, data, uploadedBy, userName } = params;
+    const { where, data, uploadedBy, userName, hospitalScope } = params;
     const { patientId, assignedTo, documents, isBasicClaimUpdate, ...rest } = data;
     let updatedDocuments: DocumentResponseDto[] = []
     let createdDocuments: DocumentResponseDto[] = []
@@ -352,8 +356,8 @@ export class InsuranceRequestsService {
     }
 
     if (patientId) {
-      const patient = await this.prisma.patient.findUnique({
-        where: { id: patientId },
+      const patient = await this.prisma.patient.findFirst({
+        where: { id: patientId, ...(hospitalScope && { hospitalUserId: hospitalScope }) },
         select: { id: true }
       });
       if (!patient) throw new BadRequestException('Invalid patient ID');
@@ -457,7 +461,9 @@ export class InsuranceRequestsService {
         updatedDocuments = await Promise.all(
           existingDocs.map(async doc => {
             const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
-            if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+            if (!existing || existing.insuranceRequestId !== updatedClaim.id) {
+              throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+            }
 
             return this.prisma.document.update({
               where: { id: doc.id },
@@ -500,9 +506,13 @@ export class InsuranceRequestsService {
     };
   }
 
-  async remove(refNumber: string): Promise<InsuranceRequest> {
+  async remove(refNumber: string, hospitalScope?: string): Promise<InsuranceRequest> {
     const isStatusClaimDraft = await this.prisma.insuranceRequest.findFirst({
-      where: { refNumber, status: ClaimStatus.DRAFT },
+      where: {
+        refNumber,
+        status: ClaimStatus.DRAFT,
+        ...(hospitalScope && { patient: { hospitalUserId: hospitalScope } })
+      },
       select: { id: true, documents: { select: { fileName: true } } }
     })
 

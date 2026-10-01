@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Request, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-users.dto';
@@ -10,6 +10,7 @@ import { MutateUserResponseDto } from './dto/mutate-users-response.dto';
 import { DropdownUsersDto, DropdownUsersResponseDto } from './dto/dropdown-users.dto';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
+import { isAdminRole, RequestUser } from 'src/common/utils/access.utils';
 
 @ApiTags('Users')
 @Controller('users')
@@ -68,12 +69,21 @@ export class UsersController {
     @ApiOperation({ summary: 'Update a User by ID, Refer CreateUserDto; all fields are optional here.' })
     @ApiResponse({ status: 200, type: MutateUserResponseDto })
     update(
-        @Param('id') id: string, 
+        @Request() req: { user: RequestUser },
+        @Param('id') id: string,
         @Body() updateuserDto: UpdateUserDto
     ): Promise<MutateUserResponseDto> {
+        const user = req.user
+        const data: UpdateUserDto = { ...updateuserDto }
+        if (!isAdminRole(user.role)) {
+            // hospital-level users may only edit their own profile, never role or hospital
+            if (id !== user.userId) throw new ForbiddenException('You can only update your own profile');
+            delete data.role
+            delete data.hospitalId
+        }
         return this.usersService.update({
             where: { id },
-            data: updateuserDto
+            data
         });
     }
 

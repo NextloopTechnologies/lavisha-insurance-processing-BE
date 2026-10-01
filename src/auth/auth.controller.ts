@@ -4,6 +4,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
+import { Permissions } from './permissions/permissions.decorator';
+import { Permission } from './permissions/permissions.enum';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -11,6 +13,7 @@ export class AuthController {
     constructor(private authService: AuthService) {}
 
     @Post('register')
+    @Permissions(Permission.USER_CREATE)
     @ApiOperation({ summary: 'Register a new user' })
     @ApiResponse({ status: 201, description: 'User registered successfully' })
     register(@Body() body: RegisterDto){
