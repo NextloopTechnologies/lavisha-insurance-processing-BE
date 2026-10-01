@@ -6,7 +6,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nes
 import { MutateQueryResponseDto } from './dto/mutate-query-response.dto';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
-import { getHospitalScope } from 'src/common/utils/access.utils';
+import { getHospitalScope, RequestUser } from 'src/common/utils/access.utils';
 
 @ApiTags("Queries")
 @Controller('queries')
@@ -20,7 +20,7 @@ export class QueriesController {
   @ApiBody({ type: CreateQueryDto })
   @ApiResponse({ status: 201, type: MutateQueryResponseDto })
   create(
-    @Request() req,
+    @Request() req: { user: RequestUser },
     @Body() createQueryDto: CreateQueryDto
   ): Promise<MutateQueryResponseDto> {
     const {userId:uploadedBy, name:userName }= req.user;
@@ -32,7 +32,7 @@ export class QueriesController {
   @ApiOperation({ summary: 'Update query by uuid, consider Create schema with all fields as optional.' })
   @ApiResponse({ status: 201, type: MutateQueryResponseDto })
   update(
-    @Request() req,
+    @Request() req: { user: RequestUser },
     @Param('id') id: string, 
     @Body() updateQueryDto: UpdateQueryDto
   ): Promise<MutateQueryResponseDto> {

@@ -7,7 +7,8 @@ import { DeleteObjectsCommandOutput } from '@aws-sdk/client-s3';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
-import { MAX_BULK_FILES, MAX_FILE_SIZE } from 'src/common/constants/file.constants';
+import { MAX_BULK_FILES, MULTER_FILE_SIZE_LIMIT } from 'src/common/constants/file.constants';
+import { RequestUser } from 'src/common/utils/access.utils';
 
 @ApiTags('File')
 @Controller('file')
@@ -17,7 +18,7 @@ export class FileController {
 
     @Post('upload')
     @Permissions(Permission.FILE_SINGLE_UPLOAD)
-    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FILE_SIZE, files: 1 } }))
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_FILE_SIZE_LIMIT, files: 1 } }))
     @ApiOperation({ summary: 'Upload a single file' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -38,7 +39,7 @@ export class FileController {
     })
     @ApiResponse({ status: 201, type: S3FileUploadResultDto })
     async uploadFile(
-        @Request() req,
+        @Request() req: { user: RequestUser },
         @UploadedFile() file: Express.Multer.File,
         @Body('folder') folder: string
     ): Promise<S3FileUploadResult> {
@@ -54,7 +55,7 @@ export class FileController {
 
     @Post('bulkUpload')
     @Permissions(Permission.FILE_BULK_UPLOAD)
-    @UseInterceptors(FilesInterceptor('files', MAX_BULK_FILES, { limits: { fileSize: MAX_FILE_SIZE, files: MAX_BULK_FILES } }))
+    @UseInterceptors(FilesInterceptor('files', MAX_BULK_FILES, { limits: { fileSize: MULTER_FILE_SIZE_LIMIT, files: MAX_BULK_FILES } }))
     @ApiOperation({ summary: 'Upload multiple files (max 6)' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -78,7 +79,7 @@ export class FileController {
     })
     @ApiResponse({ status: 200, type: [S3FileUploadResultDto] })
     async uploadMultiple(
-        @Request() req,
+        @Request() req: { user: RequestUser },
         @UploadedFiles() files: Express.Multer.File[],
         @Body('folder') folder: string
     ): Promise<S3FileUploadResult[]> {
@@ -94,7 +95,7 @@ export class FileController {
     @ApiOperation({ summary: 'Delete multiple files by file name; non-admins can only delete their own hospital\'s files' })
     @ApiBody({ type: DeleteFilesDto })
     async bulkDelete(
-        @Request() req,
+        @Request() req: { user: RequestUser },
         @Body() deleteFilesDto: DeleteFilesDto
     ): Promise<DeleteObjectsCommandOutput>{
         await this.fileService.assertCanDeleteFiles(deleteFilesDto.fileNames, req.user)

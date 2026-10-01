@@ -6,7 +6,7 @@ import { MutateEnhancementsResponseDto } from './dto/mutate-enhancements-respons
 import { UpdateEnhancementDto } from './dto/update-enhancements.dto';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
-import { getHospitalScope } from 'src/common/utils/access.utils';
+import { getHospitalScope, RequestUser } from 'src/common/utils/access.utils';
 
 @Controller('enhancements')
 @ApiTags("Enhancements")
@@ -20,7 +20,7 @@ export class EnhancementsController {
   @ApiBody({ type: CreateEnhancementDto })
   @ApiResponse({ status: 201, type: MutateEnhancementsResponseDto })
   create(
-    @Request() req,
+    @Request() req: { user: RequestUser },
     @Body() createEnhancementDto: CreateEnhancementDto
   ): Promise<MutateEnhancementsResponseDto> {
     const {userId:uploadedBy, name:userName }= req.user;
@@ -32,7 +32,7 @@ export class EnhancementsController {
   @ApiOperation({ summary: 'Update an enhancement by uuid, consider Create schema with all fields as optional.' })
   @ApiResponse({ status: 201, type: MutateEnhancementsResponseDto })
   update(
-    @Request() req,
+    @Request() req: { user: RequestUser },
     @Param('id') id: string, 
     @Body() updateEnhancementDto: UpdateEnhancementDto
   ): Promise<MutateEnhancementsResponseDto> {

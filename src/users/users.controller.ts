@@ -69,17 +69,17 @@ export class UsersController {
     @ApiOperation({ summary: 'Update a User by ID, Refer CreateUserDto; all fields are optional here.' })
     @ApiResponse({ status: 200, type: MutateUserResponseDto })
     update(
-        @Request() req,
+        @Request() req: { user: RequestUser },
         @Param('id') id: string,
         @Body() updateuserDto: UpdateUserDto
     ): Promise<MutateUserResponseDto> {
-        const user: RequestUser = req.user
-        let data = updateuserDto
+        const user = req.user
+        const data: UpdateUserDto = { ...updateuserDto }
         if (!isAdminRole(user.role)) {
             // hospital-level users may only edit their own profile, never role or hospital
             if (id !== user.userId) throw new ForbiddenException('You can only update your own profile');
-            const { role, hospitalId, ...ownProfileFields } = updateuserDto
-            data = ownProfileFields
+            delete data.role
+            delete data.hospitalId
         }
         return this.usersService.update({
             where: { id },
