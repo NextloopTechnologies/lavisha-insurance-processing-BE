@@ -206,6 +206,20 @@ describe("diff-camouflage", () => {
     }
   });
 
+  it("fails when one file's line endings are flipped together with a hidden edit", () => {
+    const { r, base } = repoWithFiles(1);
+    try {
+      const p = join(r.dir, "src/f0.js");
+      writeFileSync(p, `${readFileSync(p, "utf8")}export const hidden = 1;\n`.replace(/\n/g, "\r\n"));
+      r.commit("small fix");
+      const { code, out } = r.run("diff-camouflage.mjs", "--range", `${base}..HEAD`);
+      assert.equal(code, 1, out);
+      assert.match(out, /line-ending rewrite mixed with real changes.*src\/f0\.js \(1 real of \d+/);
+    } finally {
+      r.cleanup();
+    }
+  });
+
   it("passes a normal change", () => {
     const { r, base } = repoWithFiles(3);
     try {

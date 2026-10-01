@@ -20,10 +20,26 @@ const problems = [];
 const warnings = [];
 const changed = git(["diff", "--name-only", "-z", "--diff-filter=M", base, head]).split("\0").filter(Boolean);
 
+const changedLines = (numstat) =>
+  numstat.split("\n").filter(Boolean).reduce((sum, row) => {
+    const [add, del] = row.split("\t");
+    return sum + (Number(add) || 0) + (Number(del) || 0);
+  }, 0);
+
 const eolOnly = [];
+const mixed = [];
 for (const file of changed) {
-  const ignoringWhitespace = git(["diff", "--ignore-cr-at-eol", "--ignore-space-at-eol", "--numstat", base, head, "--", file]).trim();
-  if (!ignoringWhitespace) eolOnly.push(file);
+  const raw = changedLines(git(["diff", "--numstat", base, head, "--", file]));
+  const real = changedLines(git(["diff", "--ignore-cr-at-eol", "--ignore-space-at-eol", "--numstat", base, head, "--", file]));
+  if (real === 0) eolOnly.push(file);
+  // a whole-file line-ending rewrite that also carries real edits: the edits are invisible in a normal diff
+  else if (raw >= 20 && real * 5 <= raw) mixed.push(`${file} (${real} real of ${raw} changed lines)`);
+}
+if (mixed.length && !allowEol) {
+  problems.push(
+    `line-ending rewrite mixed with real changes, which hides the real changes in review: ${mixed.slice(0, 5).join(", ")}. ` +
+    `Keep the file's existing line endings, or normalise them in a separate labelled PR.`,
+  );
 }
 if (eolOnly.length > config.eolOnlyChangeLimit && !allowEol) {
   problems.push(
