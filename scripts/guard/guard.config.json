@@ -1,0 +1,8 @@
+{
+  "maxLineLength": 1000,
+  "maxConfigLineLength": 300,
+  "longLineAllow": ["package-lock.json", "**/*.svg", "**/*.min.js"],
+  "allowedPrepareScripts": ["husky install"],
+  "allowedRegistryHosts": ["registry.npmjs.org"],
+  "eolOnlyChangeLimit": 5
+}

@@ -1,6 +1,9 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# block obfuscated/padded payloads, hidden executables and broken configs before they are committed
+node scripts/guard/repo-hygiene.mjs --staged || exit 1
+
 npm test
 
 # Get current branch

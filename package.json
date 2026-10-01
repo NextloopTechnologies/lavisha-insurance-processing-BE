@@ -19,7 +19,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/jest/bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "guard": "node scripts/guard/repo-hygiene.mjs && node scripts/guard/merge-injection.mjs",
+    "test:guard": "node --test scripts/guard/guard.test.mjs"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
