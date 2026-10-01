@@ -18,12 +18,15 @@ export class EnhancementsService {
      async create(
         data: CreateEnhancementDto,
         uploadedBy: string,
-        userName: string
+        userName: string,
+        hospitalScope?: string
     ): Promise<MutateEnhancementsResponseDto>{
         const { insuranceRequestId, documents, status, ...rest } = data;
         if(status) throw new BadRequestException("No status are allowed on create!")
 
-        const claim = await this.prisma.insuranceRequest.findUnique({ where: { id: insuranceRequestId } });
+        const claim = await this.prisma.insuranceRequest.findFirst({
+            where: { id: insuranceRequestId, ...(hospitalScope && { patient: { hospitalUserId: hospitalScope } }) }
+        });
         if (!claim) throw new BadRequestException('Invalid claim ID');
        
         const createdEnhancement = await this.prisma.enhancement.create({ 
@@ -114,17 +117,21 @@ export class EnhancementsService {
         where: Prisma.EnhancementWhereUniqueInput,
         data: UpdateEnhancementDto,
         uploadedBy: string,
-        userName: string
+        userName: string,
+        hospitalScope?: string
     }): Promise<MutateEnhancementsResponseDto> {
-    
-        const { where, data, uploadedBy, userName } = params;
+
+        const { where, data, uploadedBy, userName, hospitalScope } = params;
         const { documents, insuranceRequestId, ...rest } = data;
         let updatedDocuments: DocumentResponseDto[] = []
         let createdDocuments: DocumentResponseDto[] = []
 
-        const enhancementExists = await this.prisma.enhancement.findUnique({ 
-            where ,
-            select: { id: true, status: true } 
+        const enhancementExists = await this.prisma.enhancement.findFirst({
+            where: {
+                id: where.id,
+                ...(hospitalScope && { insuranceRequest: { patient: { hospitalUserId: hospitalScope } } })
+            },
+            select: { id: true, status: true }
         })
         if(!enhancementExists) throw new BadRequestException('Invalid enhancement ID');
 
@@ -220,7 +227,9 @@ export class EnhancementsService {
                 updatedDocuments = await Promise.all(
                     existingDocs.map(async doc => {
                         const existing = await this.prisma.document.findUnique({ where: { id: doc.id } });
-                        if (!existing) throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+                        if (!existing || existing.enhancementId !== updatedEnhancement.id) {
+                            throw new BadRequestException(`Invalid document ID: ${doc.id}`);
+                        }
             
                         return this.prisma.document.update({
                             where: { id: doc.id },

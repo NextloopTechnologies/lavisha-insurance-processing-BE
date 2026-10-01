@@ -6,6 +6,7 @@ import { MutateEnhancementsResponseDto } from './dto/mutate-enhancements-respons
 import { UpdateEnhancementDto } from './dto/update-enhancements.dto';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
+import { getHospitalScope } from 'src/common/utils/access.utils';
 
 @Controller('enhancements')
 @ApiTags("Enhancements")
@@ -23,7 +24,7 @@ export class EnhancementsController {
     @Body() createEnhancementDto: CreateEnhancementDto
   ): Promise<MutateEnhancementsResponseDto> {
     const {userId:uploadedBy, name:userName }= req.user;
-    return this.enhancementsService.create(createEnhancementDto, uploadedBy, userName);
+    return this.enhancementsService.create(createEnhancementDto, uploadedBy, userName, getHospitalScope(req.user));
   }
 
   @Patch(':id')
@@ -40,7 +41,8 @@ export class EnhancementsController {
       where: { id }, 
       data: updateEnhancementDto,
       uploadedBy,
-      userName
+      userName,
+      hospitalScope: getHospitalScope(req.user)
     });
   }
 }

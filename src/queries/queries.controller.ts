@@ -6,6 +6,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nes
 import { MutateQueryResponseDto } from './dto/mutate-query-response.dto';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
+import { getHospitalScope } from 'src/common/utils/access.utils';
 
 @ApiTags("Queries")
 @Controller('queries')
@@ -23,7 +24,7 @@ export class QueriesController {
     @Body() createQueryDto: CreateQueryDto
   ): Promise<MutateQueryResponseDto> {
     const {userId:uploadedBy, name:userName }= req.user;
-    return this.queriesService.create(createQueryDto, uploadedBy, userName);
+    return this.queriesService.create(createQueryDto, uploadedBy, userName, getHospitalScope(req.user));
   }
   
   @Patch(':id')
@@ -40,7 +41,8 @@ export class QueriesController {
       where: { id }, 
       data: updateQueryDto,
       uploadedBy,
-      userName
+      userName,
+      hospitalScope: getHospitalScope(req.user)
     });
   }
 }
