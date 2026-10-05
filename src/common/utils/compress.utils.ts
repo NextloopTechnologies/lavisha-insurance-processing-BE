@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile);
 const PDF_COMPRESS_TIMEOUT_MS = 60_000;
 const MAX_CONCURRENT_PDF_COMPRESSIONS = 2;
 
+// always re-encodes to WebP (see COMPRESSED_IMAGE_EXT / COMPRESSED_IMAGE_MIME)
 export async function compressImage(buffer: Buffer, mimetype: string): Promise<Buffer> {
   return sharp(buffer)
     // .resize({ width: 1280 }) // resize if needed

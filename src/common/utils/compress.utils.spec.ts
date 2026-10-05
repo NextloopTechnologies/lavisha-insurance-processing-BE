@@ -1,7 +1,9 @@
 import { existsSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { execFile } from 'child_process';
-import { compressPdf } from './compress.utils';
+import * as sharp from 'sharp';
+import { COMPRESSED_IMAGE_EXT, COMPRESSED_IMAGE_MIME } from '../constants/file.constants';
+import { compressImage, compressPdf } from './compress.utils';
 
 jest.mock('child_process', () => ({ execFile: jest.fn() }));
 
@@ -12,6 +14,22 @@ const outputPathOf = (args: string[]) =>
   (args.find((a) => a.startsWith('-sOutputFile=')) ?? '').replace('-sOutputFile=', '');
 const callArgs = (i = 0) => execFileMock.mock.calls[i] as [string, string[], Record<string, unknown>];
 const inputPathOf = (args: string[]) => args[args.length - 1];
+
+describe('compressImage', () => {
+  const isWebp = (b: Buffer) => b.subarray(0, 4).toString() === 'RIFF' && b.subarray(8, 12).toString() === 'WEBP';
+  const sample = (format: 'jpeg' | 'png' | 'webp') =>
+    sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 200, g: 30, b: 30 } } }).toFormat(format).toBuffer();
+
+  it.each(['jpeg', 'png', 'webp'] as const)('re-encodes %s input as WebP', async (format) => {
+    const out = await compressImage(await sample(format), `image/${format}`);
+    expect(isWebp(out)).toBe(true);
+  });
+
+  it('exposes the stored extension and content type that match its output', () => {
+    expect(COMPRESSED_IMAGE_EXT).toBe('.webp');
+    expect(COMPRESSED_IMAGE_MIME).toBe('image/webp');
+  });
+});
 
 describe('compressPdf', () => {
   beforeEach(() => execFileMock.mockReset());
