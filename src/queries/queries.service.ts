@@ -66,14 +66,16 @@ export class QueriesService {
         message: `${userName} created ${enhancementId ? 'enhancement query' : 'query'} for claim ${refNumber}`
     }
 
+    // chat history line + hospital notification, then the assignee's notification
     await Promise.all([
-        await this.commonService.logInsuranceRequestNotification({
+        await this.commonService.logInsuranceRequestChange({
             ...notificationPayload,
-            notifiedTo,
+            notifiedTo: patientHospitalId,
+            hospitalId: patientHospitalId
         }),
         await this.commonService.logInsuranceRequestNotification({
             ...notificationPayload,
-            notifiedTo: patientHospitalId
+            notifiedTo,
         })
     ])
 
@@ -180,15 +182,17 @@ export class QueriesService {
 
     if(data.isResolved){
       const message = `${userName} has marked ${updatedQuery.enhancementId ? 'enhancement query' : 'query'} as resolved for claim ${refNumber}`
+      // chat history line + hospital notification, then the assignee's notification
       await Promise.all([
-          await this.commonService.logInsuranceRequestNotification({
+          await this.commonService.logInsuranceRequestChange({
               ...notifyAndHistoryPayload,
-              notifiedTo,
+              notifiedTo: patientHospitalId,
+              hospitalId: patientHospitalId,
               message
           }),
           await this.commonService.logInsuranceRequestNotification({
               ...notifyAndHistoryPayload,
-              notifiedTo: patientHospitalId,
+              notifiedTo,
               message
           })
       ])

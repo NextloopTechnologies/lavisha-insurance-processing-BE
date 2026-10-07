@@ -618,4 +618,78 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
         .query({ fromDate: '2020-01-01', toDate: '2030-01-01', hospitalUserId: ids.hospB }).set(as('admin')).expect(200);
     });
   });
+  // ---------------------------------------------------------------------------
+  describe('Chat history lines (claim created / assigned / pre-auth / enhancement / query)', () => {
+    let ref = '';
+    let claimId = '';
+    // lines use the user's current name; an earlier test renames hospital A
+    let hosp = '';
+    beforeAll(async () => { hosp = (await db.user.findUnique({ where: { id: ids.hospA } }))!.name; });
+    const systemLines = async () =>
+      (await db.comment.findMany({ where: { insuranceRequestId: claimId, type: 'SYSTEM' }, orderBy: { createdAt: 'asc' } })).map((c) => c.text);
+    const notificationsSince = (since: Date, message: RegExp) =>
+      db.notification.findMany({ where: { createdAt: { gte: since } } }).then((ns) => ns.filter((n) => message.test(n.message)));
+
+    it('claim created with pre-auth ticked: two chat lines, creator + super-admin still notified', async () => {
+      const since = new Date();
+      const res = await http().post('/v1/claims').set(as('hospa')).send({
+        patientId: ids.patientA, doctorName: 'Dr Chat', tpaName: 'TPA', insuranceCompany: 'Insurer', isPreAuth: true,
+        documents: [{ fileName: 'claims/chat-icp.pdf', type: DocumentType.ICP }],
+      }).expect(201);
+      ref = res.body.refNumber;
+      claimId = res.body.id;
+      const lines = await systemLines();
+      expect(lines).toContain(`${hosp} created claim ${ref}`);
+      expect(lines).toContain(`${hosp} marked pre-auth as done for ${ref}`);
+      expect(lines.filter((l) => l === `${hosp} created claim ${ref}`)).toHaveLength(1);
+      const created = await notificationsSince(since, new RegExp(`created claim ${ref}$`));
+      expect(created.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.superAdmin].sort());
+    });
+
+    it('the hospital sees those lines in its chat', async () => {
+      const res = await http().get('/v1/comments').query({ insuranceRequestId: claimId }).set(as('hospa')).expect(200);
+      const texts = res.body.filter((c: any) => c.type === 'SYSTEM').map((c: any) => c.text);
+      expect(texts).toEqual(expect.arrayContaining([`${hosp} created claim ${ref}`, `${hosp} marked pre-auth as done for ${ref}`]));
+    });
+
+    it('assigning writes one chat line; assignee and hospital are notified as before', async () => {
+      const since = new Date();
+      await http().patch(`/v1/claims/assign/${ref}`).set(as('admin')).send({ assignedTo: ids.admin }).expect(200);
+      expect((await systemLines()).filter((l) => l === `admin has assigned ${ref} to admin.`)).toHaveLength(1);
+      const notified = await notificationsSince(since, /has assigned/);
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA].sort());
+    });
+
+    it('pre-auth unticked then ticked on edit: one line each; saving without a change adds none', async () => {
+      await http().patch(`/v1/claims/${ref}`).set(as('hospa')).send({ isPreAuth: false }).expect(200);
+      await http().patch(`/v1/claims/${ref}`).set(as('hospa')).send({ isPreAuth: false, diagnosis: 'no pre-auth change' }).expect(200);
+      await http().patch(`/v1/claims/${ref}`).set(as('hospa')).send({ isPreAuth: true }).expect(200);
+      const lines = (await systemLines()).filter((l) => l.includes('pre-auth'));
+      expect(lines).toEqual([
+        `${hosp} marked pre-auth as done for ${ref}`,
+        `${hosp} marked pre-auth as not done for ${ref}`,
+        `${hosp} marked pre-auth as done for ${ref}`,
+      ]);
+    });
+
+    it('enhancement created writes a chat line', async () => {
+      await http().post('/v1/enhancements').set(as('hospa')).send({
+        insuranceRequestId: claimId, numberOfDays: 2, documents: [{ fileName: 'claims/chat-enh.pdf', type: DocumentType.OTHER }],
+      }).expect(201);
+      expect(await systemLines()).toContain(`${hosp} created enhancement for claim ${ref}`);
+    });
+
+    it('query created and query resolved write chat lines; assignee and hospital notified', async () => {
+      const created = await http().post('/v1/queries').set(as('admin')).send({
+        insuranceRequestId: claimId, notes: 'Need records', documents: [{ fileName: 'claims/chat-q.pdf', type: DocumentType.OTHER }],
+      }).expect(201);
+      const since = new Date();
+      await http().patch(`/v1/queries/${created.body.id}`).set(as('hospa')).send({ isResolved: true, resolvedRemarks: 'sent' }).expect(200);
+      const lines = await systemLines();
+      expect(lines).toContain(`admin created query for claim ${ref}`);
+      expect(lines).toContain(`${hosp} has marked query as resolved for claim ${ref}`);
+      const notified = await notificationsSince(since, /marked query as resolved/);
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA].sort());
+    });
+  });
 });
