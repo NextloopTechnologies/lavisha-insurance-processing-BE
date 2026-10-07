@@ -61,14 +61,16 @@ export class EnhancementsService {
             message: `${userName} created enhancement for claim ${refNumber}`
         }
 
+        // chat history line + hospital notification, then the assignee's notification
         await Promise.all([
-            await this.commonService.logInsuranceRequestNotification({
+            await this.commonService.logInsuranceRequestChange({
                 ...notificationPayload,
-                notifiedTo,
+                notifiedTo: patientHospitalId,
+                hospitalId: patientHospitalId
             }),
             await this.commonService.logInsuranceRequestNotification({
                 ...notificationPayload,
-                notifiedTo: patientHospitalId
+                notifiedTo,
             })
         ])
 

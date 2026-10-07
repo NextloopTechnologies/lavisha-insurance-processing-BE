@@ -89,16 +89,28 @@ export class InsuranceRequestsService {
       message: `${userName} created claim ${refNumber}`
     }
 
+    // also written to the claim's chat history
     await Promise.all([
-      await this.commonService.logInsuranceRequestNotification({
+      await this.commonService.logInsuranceRequestChange({
         ...notificationPayload,
         notifiedTo: uploadedBy,
+        hospitalId: patientHospitalId,
       }),
       await this.commonService.logInsuranceRequestNotification({
         ...notificationPayload,
         notifiedTo: isSuperAdminExists.id
       })
     ])
+
+    if (createdClaim.isPreAuth) {
+      await this.commonService.logInsuranceRequestChange({
+        userId: uploadedBy,
+        insuranceRequestId: createdClaim.id,
+        message: `${userName} marked pre-auth as done for ${refNumber}`,
+        notifiedTo: isSuperAdminExists.id,
+        hospitalId: patientHospitalId,
+      })
+    }
 
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
@@ -303,14 +315,16 @@ export class InsuranceRequestsService {
         message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
       }
 
+      // chat history line + hospital notification, then the assignee's notification
       await Promise.all([
-        await this.commonService.logInsuranceRequestNotification({
+        await this.commonService.logInsuranceRequestChange({
           ...notificationPayload,
-          notifiedTo: assigneeId
+          notifiedTo: result.patient.hospitalUserId,
+          hospitalId: result.patient.hospitalUserId
         }),
         await this.commonService.logInsuranceRequestNotification({
           ...notificationPayload,
-          notifiedTo: result.patient.hospitalUserId
+          notifiedTo: assigneeId
         })
       ])
     }
@@ -338,7 +352,7 @@ export class InsuranceRequestsService {
 
     const claimExists = await this.prisma.insuranceRequest.findUnique({
       where,
-      select: { id: true, assignedTo: true, status: true }
+      select: { id: true, assignedTo: true, status: true, isPreAuth: true }
     })
     if (!claimExists) throw new BadRequestException('Invalid claim ID');
 
@@ -410,6 +424,23 @@ export class InsuranceRequestsService {
 
     if (data.status && claimExists.status !== data.status) {
       const message = `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`
+      await Promise.all([
+        await this.commonService.logInsuranceRequestChange({
+          ...notifyAndHistoryPayload,
+          notifiedTo: assigneeId,
+          hospitalId: patientHospitalId,
+          message
+        }),
+        await this.commonService.logInsuranceRequestNotification({
+          ...notifyAndHistoryPayload,
+          notifiedTo: patientHospitalId,
+          message
+        })
+      ])
+    }
+
+    if (data.isPreAuth !== undefined && data.isPreAuth !== claimExists.isPreAuth) {
+      const message = `${userName} marked pre-auth as ${data.isPreAuth ? 'done' : 'not done'} for ${updatedClaim.refNumber}`
       await Promise.all([
         await this.commonService.logInsuranceRequestChange({
           ...notifyAndHistoryPayload,
