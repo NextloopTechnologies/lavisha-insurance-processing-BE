@@ -1,7 +1,8 @@
-import { BadRequestException, Body, Controller, Delete, Post, Request, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Post, Query, Request, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FileService } from './file.service';
 import { DeleteFilesDto } from './dto/delete-files.dto';
+import { DownloadUrlQueryDto, DownloadUrlResponseDto } from './dto/download-url.dto';
 import { S3FileUploadResult, S3FileUploadResultDto } from 'src/common/interfaces/s3.interface';
 import { DeleteObjectsCommandOutput } from '@aws-sdk/client-s3';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -88,6 +89,18 @@ export class FileController {
             throw new BadRequestException('Invalid folder. Only "profiles", "claims" or "hospitals" allowed.');
         }
         return this.fileService.uploadMultipleFiles(files, `${folder}/`, req.user);
+    }
+
+    @Get('download-url')
+    @Permissions(Permission.CLAIM_READ)
+    @ApiOperation({ summary: 'Get a short-lived link that downloads a claim document (caller must be able to see the claim)' })
+    @ApiResponse({ status: 200, type: DownloadUrlResponseDto })
+    @ApiResponse({ status: 404, description: 'Not a document on a claim the caller can see' })
+    getDownloadUrl(
+        @Request() req: { user: RequestUser },
+        @Query() query: DownloadUrlQueryDto
+    ): Promise<DownloadUrlResponseDto> {
+        return this.fileService.getDocumentDownloadUrl(query.key, req.user)
     }
 
     @Delete('bulkDelete')

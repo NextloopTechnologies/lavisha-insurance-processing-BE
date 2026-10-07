@@ -56,7 +56,11 @@ jest.mock('src/common/utils/s3.util', () => ({
 }));
 
 jest.mock('@aws-sdk/s3-request-presigner', () => ({
-  getSignedUrl: async (_client: unknown, command: any) => `https://signed.test/${command.input.Key}`,
+  getSignedUrl: async (_client: unknown, command: any, options?: { expiresIn?: number }) =>
+    `https://signed.test/${command.input.Key}` +
+    (command.input.ResponseContentDisposition
+      ? `?response-content-disposition=${encodeURIComponent(command.input.ResponseContentDisposition)}&expires=${options?.expiresIn}`
+      : ''),
 }));
 
 jest.mock('src/common/utils/compress.utils', () => ({
@@ -476,6 +480,34 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(s3Store.get(res.body.key)?.metadata).toEqual({ 'owner-scope': 'admin' });
     });
 
+    it('stores images under a .webp key with Content-Type image/webp (they are re-encoded to WebP)', async () => {
+      for (const [name, type] of [['scan.jpg', 'image/jpeg'], ['scan.jpeg', 'image/jpeg'], ['scan.png', 'image/png'], ['scan.webp', 'image/webp']]) {
+        const res = await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+          .attach('file', PNG, { filename: name, contentType: type });
+        expect(res.status).toBe(201);
+        expect(res.body.key).toMatch(/^claims\/scan_[0-9a-f-]{36}\.webp$/);
+        const put = s3Calls.filter((c) => c.name === 'PutObjectCommand').at(-1);
+        expect(put?.input.Key).toBe(res.body.key);
+        expect(put?.input.ContentType).toBe('image/webp');
+      }
+    });
+
+    it('keeps the original extension and Content-Type for PDFs', async () => {
+      const res = await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+        .attach('file', Buffer.from('%PDF-1.4\n%%EOF\n'), { filename: 'report.pdf', contentType: 'application/pdf' });
+      expect(res.status).toBe(201);
+      expect(res.body.key).toMatch(/\.pdf$/);
+      expect(s3Calls.filter((c) => c.name === 'PutObjectCommand').at(-1)?.input.ContentType).toBe('application/pdf');
+    });
+
+    it('returns a .webp public URL for profile pictures', async () => {
+      const res = await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'profiles')
+        .attach('file', PNG, { filename: 'me.png', contentType: 'image/png' });
+      expect(res.status).toBe(201);
+      expect(res.body.key).toMatch(/^profiles\/me_[0-9a-f-]{36}\.webp$/);
+      expect(res.body.url).toMatch(/\/profiles\/me_[0-9a-f-]{36}\.webp$/);
+    });
+
     it('rejects a file over 10 MB with 413 before it reaches S3', async () => {
       const puts = s3Calls.filter((c) => c.name === 'PutObjectCommand').length;
       const res = await upload('hospa', 'claims', 'big.png', Buffer.alloc(10 * 1024 * 1024 + 1));
@@ -518,6 +550,53 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
 
     it('still rejects uploads without a token', async () => {
       await http().post('/v1/file/upload').field('folder', 'claims').attach('file', PNG, 'x.png').expect(401);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  describe('GET /file/download-url (download button in the preview modal)', () => {
+    const get = (who: string | null, key?: string) => {
+      const req = http().get('/v1/file/download-url');
+      if (key !== undefined) req.query({ key });
+      return who ? req.set(as(who)) : req;
+    };
+
+    it('gives the owning hospital a short-lived attachment link with the original name', async () => {
+      const res = await get('hospa', 'claims/docA-legacy.pdf').expect(200);
+      expect(res.body.fileName).toBe('docA-legacy.pdf');
+      const url = new URL(res.body.url);
+      expect(url.pathname).toBe('/claims/docA-legacy.pdf');
+      expect(url.searchParams.get('response-content-disposition'))
+        .toBe(`attachment; filename="docA-legacy.pdf"; filename*=UTF-8''docA-legacy.pdf`);
+      expect(url.searchParams.get('expires')).toBe('300');
+    });
+
+    it('works for enhancement and query documents, and for the hospital\'s manager', async () => {
+      await get('mgra', 'claims/enhA.pdf').expect(200);
+      await get('hospa', 'claims/qA.pdf').expect(200);
+    });
+
+    it('returns 404 for another hospital\'s document', async () => {
+      await get('hospb', 'claims/docA-legacy.pdf').expect(404);
+      await get('hospa', 'claims/enhB.pdf').expect(404);
+    });
+
+    it('returns 404 for a key that is not a claim document, even for an admin', async () => {
+      await get('hospa', 'claims/orphan-legacy.pdf').expect(404);
+      await get('admin', 'claims/orphan-legacy.pdf').expect(404);
+      await get('admin', 'profiles/hospA-legacy.png').expect(404);
+    });
+
+    it('lets an admin download any hospital\'s claim document', async () => {
+      await get('admin', 'claims/docB-legacy.pdf').expect(200);
+      await get('superadmin', 'claims/qB.pdf').expect(200);
+    });
+
+    it('rejects a manager with no hospital, a missing key, and anonymous callers', async () => {
+      await get('mgrnohosp', 'claims/docB-legacy.pdf').expect(403);
+      await get('hospa').expect(400);
+      await get('hospa', '').expect(400);
+      await get(null, 'claims/docA-legacy.pdf').expect(401);
     });
   });
 
