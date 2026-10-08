@@ -11,6 +11,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } 
 import { AddAssigneeInsuranceRequestDto } from './dto/assign-insurance-requests.dto';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
+import { getHospitalScope, RequestUser } from 'src/common/utils/access.utils';
 
 @Controller('claims')
 @ApiTags('Claims')
@@ -24,11 +25,11 @@ export class InsuranceRequestsController {
   @ApiBody({ type: CreateInsuranceRequestDto })
   @ApiResponse({ status: 201, type: MutateResponseInsuranceRequestDto })
   create(
-    @Request() req,
+    @Request() req: { user: RequestUser },
     @Body() createInsuranceRequestDto: CreateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
     const { userId: uploadedBy, name: userName } = req.user
-    return this.insuranceRequestsService.create(createInsuranceRequestDto, uploadedBy, userName);
+    return this.insuranceRequestsService.create(createInsuranceRequestDto, uploadedBy, userName, getHospitalScope(req.user));
   }
 
   @Get()
@@ -127,24 +128,22 @@ export class InsuranceRequestsController {
   @ApiOperation({ summary: 'Update insurance request by ref number, consider Create schema with all fields as optional.' })
   @ApiResponse({ status: 200, type: MutateResponseInsuranceRequestDto })
   update(
-    @Request() req,
+    @Request() req: { user: RequestUser },
     @Param('refNumber') refNumber: string, 
     @Body() updateInsuranceRequestDto: UpdateInsuranceRequestDto
   ): Promise<MutateResponseInsuranceRequestDto> {
-    const { userId, name: userName, role, hospitalId } = req.user
-    let filterByHospitalId:string
-
-    if(role===Role.HOSPITAL) filterByHospitalId = userId
-    else if(role===Role.HOSPITAL_MANAGER) filterByHospitalId = hospitalId
+    const { userId, name: userName } = req.user
+    const hospitalScope = getHospitalScope(req.user)
 
     return this.insuranceRequestsService.update({
-      where: { 
+      where: {
         refNumber,
-        ...(![Role.SUPER_ADMIN, Role.ADMIN].includes(role) ? { patient: { hospitalUserId: filterByHospitalId }} : undefined )
-      }, 
+        ...(hospitalScope && { patient: { hospitalUserId: hospitalScope } })
+      },
       data: updateInsuranceRequestDto,
       uploadedBy: userId,
       userName,
+      hospitalScope,
     });
   }
 
@@ -152,8 +151,11 @@ export class InsuranceRequestsController {
   @Permissions(Permission.CLAIM_DELETE_DRAFT)
   @ApiOperation({ summary: 'Delete insurance request by ref number' })
   @ApiParam({ name: 'refNumber', example: 'CLM-00001' })
-  remove(@Param('refNumber') refNumber: string) {
-    return this.insuranceRequestsService.remove(refNumber);
+  remove(
+    @Request() req: { user: RequestUser },
+    @Param('refNumber') refNumber: string
+  ) {
+    return this.insuranceRequestsService.remove(refNumber, getHospitalScope(req.user));
   }
 }
  

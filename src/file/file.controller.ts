@@ -1,12 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, Post, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Post, Query, Request, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FileService } from './file.service';
 import { DeleteFilesDto } from './dto/delete-files.dto';
+import { DownloadUrlQueryDto, DownloadUrlResponseDto } from './dto/download-url.dto';
 import { S3FileUploadResult, S3FileUploadResultDto } from 'src/common/interfaces/s3.interface';
 import { DeleteObjectsCommandOutput } from '@aws-sdk/client-s3';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Permissions } from 'src/auth/permissions/permissions.decorator';
 import { Permission } from 'src/auth/permissions/permissions.enum';
+import { MAX_BULK_FILES, MULTER_FILE_SIZE_LIMIT } from 'src/common/constants/file.constants';
+import { RequestUser } from 'src/common/utils/access.utils';
 
 @ApiTags('File')
 @Controller('file')
@@ -16,7 +19,7 @@ export class FileController {
 
     @Post('upload')
     @Permissions(Permission.FILE_SINGLE_UPLOAD)
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_FILE_SIZE_LIMIT, files: 1 } }))
     @ApiOperation({ summary: 'Upload a single file' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -37,6 +40,7 @@ export class FileController {
     })
     @ApiResponse({ status: 201, type: S3FileUploadResultDto })
     async uploadFile(
+        @Request() req: { user: RequestUser },
         @UploadedFile() file: Express.Multer.File,
         @Body('folder') folder: string
     ): Promise<S3FileUploadResult> {
@@ -47,12 +51,12 @@ export class FileController {
             throw new BadRequestException('Invalid folder. Only "profiles", "claims" or "hospitals" allowed.');
         }
 
-        return this.fileService.uploadFile(file, `${folder}/`);
+        return this.fileService.uploadFile(file, `${folder}/`, req.user);
     }
 
     @Post('bulkUpload')
     @Permissions(Permission.FILE_BULK_UPLOAD)
-    @UseInterceptors(FilesInterceptor('files', 7))
+    @UseInterceptors(FilesInterceptor('files', MAX_BULK_FILES, { limits: { fileSize: MULTER_FILE_SIZE_LIMIT, files: MAX_BULK_FILES } }))
     @ApiOperation({ summary: 'Upload multiple files (max 6)' })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -76,22 +80,38 @@ export class FileController {
     })
     @ApiResponse({ status: 200, type: [S3FileUploadResultDto] })
     async uploadMultiple(
+        @Request() req: { user: RequestUser },
         @UploadedFiles() files: Express.Multer.File[],
         @Body('folder') folder: string
     ): Promise<S3FileUploadResult[]> {
-        if (!files?.length || files?.length>6) throw new BadRequestException('Upload atleast 1 or max 5 files!');
+        if (!files?.length || files?.length > MAX_BULK_FILES) throw new BadRequestException(`Upload atleast 1 or max ${MAX_BULK_FILES} files!`);
         if(!['profiles', 'claims', 'hospitals'].includes(folder)) {
             throw new BadRequestException('Invalid folder. Only "profiles", "claims" or "hospitals" allowed.');
         }
-        return this.fileService.uploadMultipleFiles(files, `${folder}/`);
+        return this.fileService.uploadMultipleFiles(files, `${folder}/`, req.user);
+    }
+
+    @Get('download-url')
+    @Permissions(Permission.CLAIM_READ)
+    @ApiOperation({ summary: 'Get a short-lived link that downloads a claim document (caller must be able to see the claim)' })
+    @ApiResponse({ status: 200, type: DownloadUrlResponseDto })
+    @ApiResponse({ status: 404, description: 'Not a document on a claim the caller can see' })
+    getDownloadUrl(
+        @Request() req: { user: RequestUser },
+        @Query() query: DownloadUrlQueryDto
+    ): Promise<DownloadUrlResponseDto> {
+        return this.fileService.getDocumentDownloadUrl(query.key, req.user)
     }
 
     @Delete('bulkDelete')
-    @ApiOperation({ summary: 'Delete multiple files by file name' })
+    @Permissions(Permission.FILE_SINGLE_UPLOAD)
+    @ApiOperation({ summary: 'Delete multiple files by file name; non-admins can only delete their own hospital\'s files' })
     @ApiBody({ type: DeleteFilesDto })
     async bulkDelete(
+        @Request() req: { user: RequestUser },
         @Body() deleteFilesDto: DeleteFilesDto
     ): Promise<DeleteObjectsCommandOutput>{
+        await this.fileService.assertCanDeleteFiles(deleteFilesDto.fileNames, req.user)
         return this.fileService.deleteMultipleFiles(deleteFilesDto.fileNames)
     }
 }

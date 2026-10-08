@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsIn, IsString, MinLength } from 'class-validator';
 import { Role } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -18,5 +18,10 @@ export class RegisterDto {
 
   @ApiProperty({ enum: Role, example: Role.HOSPITAL })
   @IsEnum(Role)
+  @IsIn([
+    Role.ADMIN,
+    Role.HOSPITAL,
+    Role.HOSPITAL_MANAGER,
+  ], { message: 'SUPERADMIN cannot be created manually' })
   role: Role;
 }
