@@ -196,16 +196,17 @@ describeIfDb('Claim lifecycle across all roles (e2e)', () => {
     await moveTo('mgr', ClaimStatus.QUERY_REPLY_SENT);
   });
 
-  it('denied, then reconsideration sent by the hospital (an enhancement) and approved', async () => {
+  it('denied, the denial reversed to approved, then an enhancement requested by the hospital and approved', async () => {
     await moveTo('admin', ClaimStatus.DENIED);
+    await moveTo('admin', ClaimStatus.APPROVED);
     const enhancement = await http().post('/v1/enhancements').set(as('hosp')).send({
-      insuranceRequestId: ids.claim, numberOfDays: 2, notes: 'Requesting reconsideration',
+      insuranceRequestId: ids.claim, numberOfDays: 2, notes: 'Two more days needed',
       documents: [doc('revised-icp-1.pdf', 'ICP'), doc('revised-icp-2.pdf', 'ICP')],
     }).expect(201);
     ids.enhancement = enhancement.body.id;
     expect(await notified(new RegExp(`created enhancement for claim ${ref}$`))).toEqual(HOSPITAL_SIDE());
     await moveTo('hosp', ClaimStatus.ENHANCEMENT);
-    expect(LABEL.ENHANCEMENT).toBe('Reconsideration Sent');
+    expect(LABEL.ENHANCEMENT).toBe('Enhancement');
     await moveTo('admin', ClaimStatus.APPROVED);
   });
 
@@ -248,7 +249,7 @@ describeIfDb('Claim lifecycle across all roles (e2e)', () => {
       .filter((l) => l.includes('updated status'))
       .map((l) => labels.find((label) => l.endsWith(` to ${label} for ${ref}`)));
     expect(trail).toEqual([
-      'Pre-Auth Sent to TPA', 'Query', 'Query Reply Sent', 'Pre-Auth Denied', 'Reconsideration Sent', 'Pre-Auth Approved',
+      'Pre-Auth Sent to TPA', 'Query', 'Query Reply Sent', 'Pre-Auth Denied', 'Pre-Auth Approved', 'Enhancement', 'Pre-Auth Approved',
       'Discharge Initiated', 'Discharge Sent', 'Discharge Approved', 'Settlement Initiated', 'Settled',
     ]);
   });

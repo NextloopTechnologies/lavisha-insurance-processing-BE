@@ -140,7 +140,7 @@ enum ClaimStatus {
   QUERIED
   APPROVED
   DENIED
-  ENHANCEMENT // shown as "Reconsideration Sent"
+  ENHANCEMENT
   DISCHARGED // shown as "Discharge Approved"
   SETTLED
   QUERY_REPLY_SENT

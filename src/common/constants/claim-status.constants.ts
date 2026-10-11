@@ -1,7 +1,6 @@
 import { ClaimStatus } from '@prisma/client';
 
-// Display names for claim statuses (same as the web app). ENHANCEMENT is the
-// reconsideration step and DISCHARGED is "Discharge Approved".
+// Display names for claim statuses (same as the web app). DISCHARGED is "Discharge Approved".
 export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
   DRAFT: 'Draft',
   PENDING: 'Pre-Auth Pending',
@@ -9,7 +8,7 @@ export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
   APPROVED: 'Pre-Auth Approved',
   QUERIED: 'Query',
   QUERY_REPLY_SENT: 'Query Reply Sent',
-  ENHANCEMENT: 'Reconsideration Sent',
+  ENHANCEMENT: 'Enhancement',
   DENIED: 'Pre-Auth Denied',
   DISCHARGE_INITIATED: 'Discharge Initiated',
   DISCHARGE_SENT: 'Discharge Sent',
@@ -22,7 +21,7 @@ export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
 export const CLAIM_STAGES: { key: string; label: string; statuses: ClaimStatus[] }[] = [
   { key: 'PRE_AUTH', label: 'Pre-Auth', statuses: [ClaimStatus.PENDING, ClaimStatus.SENT_TO_TPA, ClaimStatus.APPROVED] },
   { key: 'QUERY', label: 'Query', statuses: [ClaimStatus.QUERIED, ClaimStatus.QUERY_REPLY_SENT] },
-  { key: 'RECONSIDERATION', label: 'Reconsideration', statuses: [ClaimStatus.ENHANCEMENT] },
+  { key: 'ENHANCEMENT', label: 'Enhancement', statuses: [ClaimStatus.ENHANCEMENT] },
   { key: 'DENIED', label: 'Denied', statuses: [ClaimStatus.DENIED] },
   { key: 'DISCHARGE', label: 'Discharge', statuses: [ClaimStatus.DISCHARGE_INITIATED, ClaimStatus.DISCHARGE_SENT, ClaimStatus.DISCHARGED] },
   { key: 'SETTLEMENT', label: 'Settlement', statuses: [ClaimStatus.SETTLEMENT_INITIATED] },
