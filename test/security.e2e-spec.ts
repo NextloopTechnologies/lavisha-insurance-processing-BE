@@ -719,6 +719,23 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       await http().get('/v1/dashboard')
         .query({ fromDate: '2020-01-01', toDate: '2030-01-01', hospitalUserId: ids.hospB }).set(as('admin')).expect(200);
     });
+
+    it('breaks claims down by every stage and status, for admins and hospitals', async () => {
+      const range = { fromDate: '2020-01-01', toDate: '2030-01-01' };
+      for (const who of ['admin', 'hospa']) {
+        const { body } = await http().get('/v1/dashboard').query(range).set(as(who)).expect(200);
+        const stageTotal = body.claimsByStage.reduce((sum: number, s: any) => sum + s.count, 0);
+        expect(stageTotal).toBe(body.totalClaims);
+        expect(body.claimsByStatus.map((s: any) => s.status).sort()).toEqual(Object.values(ClaimStatus).sort());
+        // each status sits in exactly one stage
+        const staged = body.claimsByStage.flatMap((s: any) => s.statuses.map((x: any) => x.status));
+        expect(staged.sort()).toEqual(Object.values(ClaimStatus).sort());
+        const draft = body.claimsByStage.find((s: any) => s.key === 'DRAFT');
+        expect(draft.count).toBe(await db.insuranceRequest.count({
+          where: { status: ClaimStatus.DRAFT, ...(who === 'hospa' && { patient: { hospitalUserId: ids.hospA } }) },
+        }));
+      }
+    });
   });
   // ---------------------------------------------------------------------------
   describe('Chat history lines (claim created / assigned / pre-auth / enhancement / query)', () => {
