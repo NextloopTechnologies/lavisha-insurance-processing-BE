@@ -8,6 +8,7 @@ import { DocumentResponseDto, MutateResponseInsuranceRequestDto } from './dto/mu
 import { FileService } from 'src/file/file.service';
 import { CommonService } from 'src/common/common.service';
 import { AddAssigneeInsuranceRequestDto } from './dto/assign-insurance-requests.dto';
+import { CLAIM_STATUS_LABELS } from 'src/common/constants/claim-status.constants';
 
 @Injectable()
 export class InsuranceRequestsService {
@@ -90,25 +91,17 @@ export class InsuranceRequestsService {
     }
 
     // also written to the claim's chat history
-    await Promise.all([
-      await this.commonService.logInsuranceRequestChange({
-        ...notificationPayload,
-        notifiedTo: uploadedBy,
-        hospitalId: patientHospitalId,
-      }),
-      await this.commonService.logInsuranceRequestNotification({
-        ...notificationPayload,
-        notifiedTo: isSuperAdminExists.id
-      })
-    ])
+    await this.commonService.notifyClaimEvent({
+      ...notificationPayload,
+      includeSuperAdmins: true
+    })
 
     if (createdClaim.isPreAuth) {
-      await this.commonService.logInsuranceRequestChange({
+      await this.commonService.notifyClaimEvent({
         userId: uploadedBy,
         insuranceRequestId: createdClaim.id,
         message: `${userName} marked pre-auth as done for ${refNumber}`,
-        notifiedTo: isSuperAdminExists.id,
-        hospitalId: patientHospitalId,
+        includeSuperAdmins: true,
       })
     }
 
@@ -131,17 +124,10 @@ export class InsuranceRequestsService {
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}`,
     }
 
-    await Promise.all([
-      await this.commonService.logInsuranceRequestChange({
-        ...notifyAndHistoryPayload,
-        notifiedTo: uploadedBy,
-        hospitalId: patientHospitalId,
-      }),
-      await this.commonService.logInsuranceRequestNotification({
-        ...notifyAndHistoryPayload,
-        notifiedTo: isSuperAdminExists.id
-      })
-    ])
+    await this.commonService.notifyClaimEvent({
+      ...notifyAndHistoryPayload,
+      includeSuperAdmins: true
+    })
 
     return {
       id: createdClaim.id,
@@ -315,18 +301,11 @@ export class InsuranceRequestsService {
         message: `${userName} has assigned ${result.refNumber} to ${result.assignee.name}.`
       }
 
-      // chat history line + hospital notification, then the assignee's notification
-      await Promise.all([
-        await this.commonService.logInsuranceRequestChange({
-          ...notificationPayload,
-          notifiedTo: result.patient.hospitalUserId,
-          hospitalId: result.patient.hospitalUserId
-        }),
-        await this.commonService.logInsuranceRequestNotification({
-          ...notificationPayload,
-          notifiedTo: assigneeId
-        })
-      ])
+      // chat history line; the other side of the claim is notified
+      await this.commonService.notifyClaimEvent({
+        ...notificationPayload,
+        alsoNotify: [assigneeId]
+      })
     }
     const { id, refNumber, assignedTo } = result
     return {
@@ -423,37 +402,19 @@ export class InsuranceRequestsService {
     }
 
     if (data.status && claimExists.status !== data.status) {
-      const message = `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`
-      await Promise.all([
-        await this.commonService.logInsuranceRequestChange({
-          ...notifyAndHistoryPayload,
-          notifiedTo: assigneeId,
-          hospitalId: patientHospitalId,
-          message
-        }),
-        await this.commonService.logInsuranceRequestNotification({
-          ...notifyAndHistoryPayload,
-          notifiedTo: patientHospitalId,
-          message
-        })
-      ])
+      const message = `${userName} updated status from ${CLAIM_STATUS_LABELS[claimExists.status]} to ${CLAIM_STATUS_LABELS[data.status]} for ${updatedClaim.refNumber}`
+      await this.commonService.notifyClaimEvent({
+        ...notifyAndHistoryPayload,
+        message
+      })
     }
 
     if (data.isPreAuth !== undefined && data.isPreAuth !== claimExists.isPreAuth) {
       const message = `${userName} marked pre-auth as ${data.isPreAuth ? 'done' : 'not done'} for ${updatedClaim.refNumber}`
-      await Promise.all([
-        await this.commonService.logInsuranceRequestChange({
-          ...notifyAndHistoryPayload,
-          notifiedTo: assigneeId,
-          hospitalId: patientHospitalId,
-          message
-        }),
-        await this.commonService.logInsuranceRequestNotification({
-          ...notifyAndHistoryPayload,
-          notifiedTo: patientHospitalId,
-          message
-        })
-      ])
+      await this.commonService.notifyClaimEvent({
+        ...notifyAndHistoryPayload,
+        message
+      })
     }
 
     if (documents?.length) {
@@ -473,19 +434,10 @@ export class InsuranceRequestsService {
 
         if (!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
         const message = `${userName} added ${createdDocuments.length} document(s) for ${updatedClaim.refNumber}`
-        await Promise.all([
-          await this.commonService.logInsuranceRequestChange({
-            ...notifyAndHistoryPayload,
-            notifiedTo: assigneeId,
-            hospitalId: patientHospitalId,
-            message
-          }),
-          await this.commonService.logInsuranceRequestNotification({
-            ...notifyAndHistoryPayload,
-            notifiedTo: patientHospitalId,
-            message
-          })
-        ])
+        await this.commonService.notifyClaimEvent({
+          ...notifyAndHistoryPayload,
+          message
+        })
       }
 
       if (existingDocs?.length) {
@@ -511,19 +463,10 @@ export class InsuranceRequestsService {
         if (!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
 
         const message = `${userName} modified ${updatedDocuments.length} document(s) for ${updatedClaim.refNumber}`
-        await Promise.all([
-          await this.commonService.logInsuranceRequestChange({
-            ...notifyAndHistoryPayload,
-            notifiedTo: assigneeId,
-            hospitalId: patientHospitalId,
-            message
-          }),
-          await this.commonService.logInsuranceRequestNotification({
-            ...notifyAndHistoryPayload,
-            notifiedTo: patientHospitalId,
-            message
-          })
-        ])
+        await this.commonService.notifyClaimEvent({
+          ...notifyAndHistoryPayload,
+          message
+        })
       }
     }
 

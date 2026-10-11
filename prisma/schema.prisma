@@ -141,8 +141,12 @@ enum ClaimStatus {
   APPROVED
   DENIED
   ENHANCEMENT
-  DISCHARGED
+  DISCHARGED // shown as "Discharge Approved"
   SETTLED
+  QUERY_REPLY_SENT
+  DISCHARGE_INITIATED
+  DISCHARGE_SENT
+  SETTLEMENT_INITIATED
 }
 
 model Enhancement {

@@ -51,7 +51,6 @@ export class EnhancementsService {
     
         if(!createdEnhancement) throw new BadRequestException("Failed to create enhancement!")
         const patientHospitalId = createdEnhancement.insuranceRequest.patient.hospital.id
-        const notifiedTo = createdEnhancement.insuranceRequest.assignedTo
         const refNumber = createdEnhancement.insuranceRequest.refNumber
 
         // notify to assignee and hospital user
@@ -61,18 +60,10 @@ export class EnhancementsService {
             message: `${userName} created enhancement for claim ${refNumber}`
         }
 
-        // chat history line + hospital notification, then the assignee's notification
-        await Promise.all([
-            await this.commonService.logInsuranceRequestChange({
-                ...notificationPayload,
-                notifiedTo: patientHospitalId,
-                hospitalId: patientHospitalId
-            }),
-            await this.commonService.logInsuranceRequestNotification({
-                ...notificationPayload,
-                notifiedTo,
-            })
-        ])
+        // chat history line; the other side of the claim is notified
+        await this.commonService.notifyClaimEvent({
+          ...notificationPayload
+        })
 
         const createdDocuments = await this.prisma.document.createManyAndReturn({
           data: documents.map((document) => ({
@@ -93,17 +84,9 @@ export class EnhancementsService {
             message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`,
         }
 
-        await Promise.all([
-            await this.commonService.logInsuranceRequestChange({
-                ...notifyAndHistoryPayload,
-                notifiedTo,
-                hospitalId: patientHospitalId,
-            }),
-            await this.commonService.logInsuranceRequestNotification({
-                ...notifyAndHistoryPayload,
-                notifiedTo: patientHospitalId
-            })
-        ])
+        await this.commonService.notifyClaimEvent({
+          ...notifyAndHistoryPayload
+        })
     
         return {
           id: createdEnhancement.id,
@@ -159,7 +142,6 @@ export class EnhancementsService {
 
         if(!updatedEnhancement) throw new BadRequestException("Failed to update enhancement!")
         const patientHospitalId = updatedEnhancement.insuranceRequest.patient.hospital.id
-        const notifiedTo = updatedEnhancement.insuranceRequest.assignedTo
         const refNumber = updatedEnhancement.insuranceRequest.refNumber
 
         await this.commonService.logActivity(
@@ -177,19 +159,10 @@ export class EnhancementsService {
 
         if(data.status && enhancementExists.status !== data.status){
             const message = `${userName} updated status from ${enhancementExists.status} to ${data.status} for ${refNumber}'s enhancement.`
-            await Promise.all([
-                await this.commonService.logInsuranceRequestChange({
-                    ...notifyAndHistoryPayload,
-                    notifiedTo,
-                    hospitalId: patientHospitalId,
-                    message
-                }),
-                await this.commonService.logInsuranceRequestNotification({
-                    ...notifyAndHistoryPayload,
-                    notifiedTo: patientHospitalId,
-                    message
-                })
-            ])
+            await this.commonService.notifyClaimEvent({
+              ...notifyAndHistoryPayload,
+              message
+            })
         }
 
         if(documents?.length){
@@ -210,19 +183,10 @@ export class EnhancementsService {
                 if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
 
                 const message = `${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s enhancement.`
-                await Promise.all([
-                    await this.commonService.logInsuranceRequestChange({
-                        ...notifyAndHistoryPayload,
-                        notifiedTo,
-                        hospitalId: patientHospitalId,
-                        message
-                    }),
-                    await this.commonService.logInsuranceRequestNotification({
-                        ...notifyAndHistoryPayload,
-                        notifiedTo: patientHospitalId,
-                        message
-                    })
-                ])
+                await this.commonService.notifyClaimEvent({
+                  ...notifyAndHistoryPayload,
+                  message
+                })
             }
 
             if(existingDocs?.length){
@@ -248,19 +212,10 @@ export class EnhancementsService {
                 if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
 
                 const message = `${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s enhancement.`
-                await Promise.all([
-                    await this.commonService.logInsuranceRequestChange({
-                        ...notifyAndHistoryPayload,
-                        notifiedTo,
-                        hospitalId: patientHospitalId,
-                        message
-                    }),
-                    await this.commonService.logInsuranceRequestNotification({
-                        ...notifyAndHistoryPayload,
-                        notifiedTo: patientHospitalId,
-                        message
-                    })
-                ])
+                await this.commonService.notifyClaimEvent({
+                  ...notifyAndHistoryPayload,
+                  message
+                })
             }
         }
 

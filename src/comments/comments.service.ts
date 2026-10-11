@@ -2,16 +2,18 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateCommentsDto } from './dto/create-comments.dto';
 import { Comment, CommentType, Prisma, Role } from '@prisma/client';
+import { CommonService } from 'src/common/common.service';
 
 @Injectable()
 export class CommentsService {
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService, private commonService: CommonService) {}
 
     async create(
         role: Role,
         data: CreateCommentsDto,
         createdBy: string,
-        loggedInUserHospitalId: string
+        loggedInUserHospitalId: string,
+        userName?: string
     ): Promise<Comment> {
         const { insuranceRequestId, hospitalId: payloadHospitalId, ...rest } = data;
         let hospitalIdForCreateQuery: string
@@ -47,15 +49,30 @@ export class CommentsService {
             role === Role.SUPER_ADMIN ||
             role === Role.HOSPITAL_MANAGER
         ) ? false : true;
-        return await this.prisma.comment.create({
+        const comment = await this.prisma.comment.create({
             data: {
                 hospital: { connect: { id: hospitalIdForCreateQuery } },
                 ...rest,
                 ...(insuranceRequestId ? { insuranceRequest: { connect: { id: insuranceRequestId } } } : undefined),
                 ...(insuranceRequestId && { isRead: isRead }),
                 creator: { connect: { id: createdBy } }
-            }
+            },
+            include: { insuranceRequest: { select: { refNumber: true } } }
         });
+
+        // claim chat messages notify the other side (the message itself is the chat line)
+        if (comment.insuranceRequestId) {
+            const preview = comment.text.length > 80 ? `${comment.text.slice(0, 80)}…` : comment.text
+            await this.commonService.notifyClaimEvent({
+                userId: createdBy,
+                insuranceRequestId: comment.insuranceRequestId,
+                message: `${userName ?? 'Someone'} commented on ${comment.insuranceRequest?.refNumber}: "${preview}"`,
+                chat: false,
+            })
+        }
+
+        const { insuranceRequest, ...created } = comment
+        return created;
     }
 
 

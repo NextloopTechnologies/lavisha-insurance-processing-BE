@@ -14,6 +14,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient, Role, ClaimStatus, DocumentType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as request from 'supertest';
+import { MAX_BULK_FILES } from 'src/common/constants/file.constants';
 
 // ---- fakes (hoisted above imports by jest) ---------------------------------
 
@@ -459,6 +460,28 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
     const upload = (who: string, folder = 'claims', name = 'scan.png', buffer = PNG) =>
       http().post('/v1/file/upload').set(as(who)).field('folder', folder).attach('file', buffer, { filename: name, contentType: 'image/png' });
 
+    it('accepts Excel sheets, including ones the browser sends as application/octet-stream', async () => {
+      const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const sheet = Buffer.from('PK\u0003\u0004 fake workbook');
+      const contentTypeOf = (key: string) =>
+        s3Calls.filter((c) => c.name === 'PutObjectCommand' && c.input.Key === key).pop()?.input.ContentType;
+
+      const typed = await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+        .attach('file', sheet, { filename: 'Final Bill.xlsx', contentType: XLSX_MIME });
+      expect(typed.status).toBe(201);
+      expect(typed.body.key).toMatch(/^claims\/Final_Bill_[0-9a-f-]{36}\.xlsx$/);
+      expect(contentTypeOf(typed.body.key)).toBe(XLSX_MIME);
+
+      const generic = await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+        .attach('file', sheet, { filename: 'rates.xls', contentType: 'application/octet-stream' });
+      expect(generic.status).toBe(201);
+      expect(contentTypeOf(generic.body.key)).toBe('application/vnd.ms-excel');
+
+      await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+        .attach('file', sheet, { filename: 'tool.exe', contentType: 'application/octet-stream' })
+        .expect(400);
+    });
+
     it('tags a hospital upload with that hospital', async () => {
       const res = await upload('hospa');
       expect(res.status).toBe(201);
@@ -529,21 +552,21 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(s3Calls.filter((c) => c.name === 'PutObjectCommand').length).toBe(puts);
     });
 
-    it('rejects more than 6 files in a bulk upload and stores none', async () => {
+    it(`rejects more than ${MAX_BULK_FILES} files in a bulk upload and stores none`, async () => {
       const puts = s3Calls.filter((c) => c.name === 'PutObjectCommand').length;
       let req = http().post('/v1/file/bulkUpload').set(as('hospa')).field('folder', 'claims');
-      for (let i = 0; i < 7; i++) req = req.attach('files', PNG, { filename: `f${i}.png`, contentType: 'image/png' });
+      for (let i = 0; i <= MAX_BULK_FILES; i++) req = req.attach('files', PNG, { filename: `f${i}.png`, contentType: 'image/png' });
       const res = await req;
       expect(res.status).toBe(400);
       expect(s3Calls.filter((c) => c.name === 'PutObjectCommand').length).toBe(puts);
     });
 
-    it('accepts 6 files in a bulk upload and tags each', async () => {
+    it(`accepts ${MAX_BULK_FILES} files in a bulk upload and tags each`, async () => {
       let req = http().post('/v1/file/bulkUpload').set(as('hospb')).field('folder', 'claims');
-      for (let i = 0; i < 6; i++) req = req.attach('files', PNG, { filename: `g${i}.png`, contentType: 'image/png' });
+      for (let i = 0; i < MAX_BULK_FILES; i++) req = req.attach('files', PNG, { filename: `g${i}.png`, contentType: 'image/png' });
       const res = await req;
       expect(res.status).toBe(201);
-      expect(res.body).toHaveLength(6);
+      expect(res.body).toHaveLength(MAX_BULK_FILES);
       ids.keyHospB = res.body[0].key;
       for (const item of res.body) expect(s3Store.get(item.key)?.metadata).toEqual({ 'owner-scope': ids.hospB });
     });
@@ -696,6 +719,23 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       await http().get('/v1/dashboard')
         .query({ fromDate: '2020-01-01', toDate: '2030-01-01', hospitalUserId: ids.hospB }).set(as('admin')).expect(200);
     });
+
+    it('breaks claims down by every stage and status, for admins and hospitals', async () => {
+      const range = { fromDate: '2020-01-01', toDate: '2030-01-01' };
+      for (const who of ['admin', 'hospa']) {
+        const { body } = await http().get('/v1/dashboard').query(range).set(as(who)).expect(200);
+        const stageTotal = body.claimsByStage.reduce((sum: number, s: any) => sum + s.count, 0);
+        expect(stageTotal).toBe(body.totalClaims);
+        expect(body.claimsByStatus.map((s: any) => s.status).sort()).toEqual(Object.values(ClaimStatus).sort());
+        // each status sits in exactly one stage
+        const staged = body.claimsByStage.flatMap((s: any) => s.statuses.map((x: any) => x.status));
+        expect(staged.sort()).toEqual(Object.values(ClaimStatus).sort());
+        const draft = body.claimsByStage.find((s: any) => s.key === 'DRAFT');
+        expect(draft.count).toBe(await db.insuranceRequest.count({
+          where: { status: ClaimStatus.DRAFT, ...(who === 'hospa' && { patient: { hospitalUserId: ids.hospA } }) },
+        }));
+      }
+    });
   });
   // ---------------------------------------------------------------------------
   describe('Chat history lines (claim created / assigned / pre-auth / enhancement / query)', () => {
@@ -709,7 +749,7 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
     const notificationsSince = (since: Date, message: RegExp) =>
       db.notification.findMany({ where: { createdAt: { gte: since } } }).then((ns) => ns.filter((n) => message.test(n.message)));
 
-    it('claim created with pre-auth ticked: two chat lines, creator + super-admin still notified', async () => {
+    it('claim created with pre-auth ticked: two chat lines; super-admin notified, not the creator', async () => {
       const since = new Date();
       const res = await http().post('/v1/claims').set(as('hospa')).send({
         patientId: ids.patientA, doctorName: 'Dr Chat', tpaName: 'TPA', insuranceCompany: 'Insurer', isPreAuth: true,
@@ -722,7 +762,7 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(lines).toContain(`${hosp} marked pre-auth as done for ${ref}`);
       expect(lines.filter((l) => l === `${hosp} created claim ${ref}`)).toHaveLength(1);
       const created = await notificationsSince(since, new RegExp(`created claim ${ref}$`));
-      expect(created.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.superAdmin].sort());
+      expect(created.map((n) => n.userId)).toEqual([ids.superAdmin]);
     });
 
     it('the hospital sees those lines in its chat', async () => {
@@ -731,12 +771,30 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(texts).toEqual(expect.arrayContaining([`${hosp} created claim ${ref}`, `${hosp} marked pre-auth as done for ${ref}`]));
     });
 
-    it('assigning writes one chat line; assignee and hospital are notified as before', async () => {
+    it('assigning writes one chat line; the hospital and its manager are notified, not the acting admin', async () => {
       const since = new Date();
       await http().patch(`/v1/claims/assign/${ref}`).set(as('admin')).send({ assignedTo: ids.admin }).expect(200);
       expect((await systemLines()).filter((l) => l === `admin has assigned ${ref} to admin.`)).toHaveLength(1);
       const notified = await notificationsSince(since, /has assigned/);
-      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA].sort());
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.mgrA].sort());
+    });
+
+    it('a super-admin assigning to someone else also notifies the new assignee', async () => {
+      const since = new Date();
+      await http().patch(`/v1/claims/assign/${ref}`).set(as('superadmin')).send({ assignedTo: ids.admin }).expect(200);
+      const notified = await notificationsSince(since, /has assigned/);
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA, ids.mgrA].sort());
+    });
+
+    it('status changes accept the new flow statuses and use display names in the chat line', async () => {
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'SENT_TO_TPA' }).expect(200);
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'QUERY_REPLY_SENT' }).expect(200);
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'DISCHARGE_INITIATED' }).expect(200);
+      const lines = await systemLines();
+      expect(lines).toContain(`admin updated status from Pre-Auth Pending to Pre-Auth Sent to TPA for ${ref}`);
+      expect(lines).toContain(`admin updated status from Pre-Auth Sent to TPA to Query Reply Sent for ${ref}`);
+      expect(lines).toContain(`admin updated status from Query Reply Sent to Discharge Initiated for ${ref}`);
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'NOT_A_STATUS' }).expect(400);
     });
 
     it('pre-auth unticked then ticked on edit: one line each; saving without a change adds none', async () => {
@@ -768,7 +826,33 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(lines).toContain(`admin created query for claim ${ref}`);
       expect(lines).toContain(`${hosp} has marked query as resolved for claim ${ref}`);
       const notified = await notificationsSince(since, /marked query as resolved/);
-      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA].sort());
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.superAdmin].sort());
+    });
+
+    it('chat messages on a claim notify the other side, never the sender', async () => {
+      // the message texts are unique to this test, so no time window is needed
+      const epoch = new Date(0);
+      await http().post('/v1/comments').set(as('hospa')).send({ type: 'NOTE', text: 'Patient shifted to ward 3', insuranceRequestId: claimId }).expect(201);
+      let notified = await notificationsSince(epoch, new RegExp(`commented on ${ref}: "Patient shifted to ward 3"$`));
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.superAdmin].sort());
+
+      await http().post('/v1/comments').set(as('admin')).send({ type: 'NOTE', text: 'Noted by admin', insuranceRequestId: claimId, hospitalId: ids.hospA }).expect(201);
+      notified = await notificationsSince(epoch, /commented on .*: "Noted by admin"$/);
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.mgrA].sort());
+      expect(await systemLines()).not.toContain('Noted by admin');
+    });
+
+    it('an enhancement on an unassigned claim no longer fails while notifying', async () => {
+      const claim = await http().post('/v1/claims').set(as('hospa')).send({
+        patientId: ids.patientA, doctorName: 'Dr Unassigned', tpaName: 'TPA', insuranceCompany: 'Insurer',
+        documents: [{ fileName: 'claims/unassigned-icp.pdf', type: DocumentType.ICP }],
+      }).expect(201);
+      const since = new Date();
+      await http().post('/v1/enhancements').set(as('hospa')).send({
+        insuranceRequestId: claim.body.id, numberOfDays: 1, documents: [{ fileName: 'claims/unassigned-enh.pdf', type: DocumentType.OTHER }],
+      }).expect(201);
+      const notified = await notificationsSince(since, new RegExp(`created enhancement for claim ${claim.body.refNumber}$`));
+      expect(notified.map((n) => n.userId)).toEqual([ids.superAdmin]);
     });
   });
 });

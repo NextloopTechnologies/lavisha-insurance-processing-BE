@@ -3,10 +3,47 @@ import { ClaimStatus, Prisma, Role } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FilterDashboardDto } from './dto/filter-dashboard.dto';
 import { percent, subtractMonths } from 'src/common/utils/general.utils';
+import { CLAIM_STAGES, CLAIM_STATUS_LABELS } from 'src/common/constants/claim-status.constants';
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Claim counts per status and per stage (every status belongs to one stage).
+   * percentageSettled / Enhancement / Pending are kept for older clients.
+   */
+  async statusBreakdown(claimWhere: Prisma.InsuranceRequestWhereInput) {
+    const grouped = await this.prisma.insuranceRequest.groupBy({
+      by: ['status'],
+      where: claimWhere,
+      _count: { _all: true },
+    })
+    const countOf = (status: ClaimStatus) => grouped.find((g) => g.status === status)?._count._all ?? 0
+    const total = grouped.reduce((sum, g) => sum + g._count._all, 0)
+
+    const claimsByStage = CLAIM_STAGES.map((stage) => {
+      const statuses = stage.statuses.map((status) => ({
+        status,
+        label: CLAIM_STATUS_LABELS[status],
+        count: countOf(status),
+      }))
+      const count = statuses.reduce((sum, s) => sum + s.count, 0)
+      return { key: stage.key, label: stage.label, count, percentage: percent(total, count), statuses }
+    })
+
+    return {
+      claimsByStage,
+      claimsByStatus: Object.values(ClaimStatus).map((status) => ({
+        status,
+        label: CLAIM_STATUS_LABELS[status],
+        count: countOf(status),
+      })),
+      percentageSettled: percent(total, countOf(ClaimStatus.SETTLED)),
+      percentageEnhancement: percent(total, countOf(ClaimStatus.ENHANCEMENT)),
+      percentagePending: percent(total, countOf(ClaimStatus.PENDING)),
+    }
+  }
 
   async adminDashboard(
     filter: FilterDashboardDto
@@ -40,27 +77,7 @@ export class DashboardService {
       })
     ])
 
-     // 4. Status-based % counts
-    const [settledCount, enhancementCount, pendingCount] = await Promise.all([
-      this.prisma.insuranceRequest.count({
-        where: {
-          ...claimWhere,
-          status: ClaimStatus.SETTLED,
-        },
-      }),
-      this.prisma.insuranceRequest.count({
-        where: {
-          ...claimWhere,
-          status: ClaimStatus.ENHANCEMENT,
-        },
-      }),
-      this.prisma.insuranceRequest.count({
-        where: {
-          ...claimWhere,
-          status: ClaimStatus.PENDING,
-        },
-      }),
-    ]);
+    const breakdown = await this.statusBreakdown(claimWhere);
 
     const [threeMonths, sixMonths, nineMonths, oneYear] = await Promise.all([
       await this.prisma.user.count({
@@ -102,9 +119,8 @@ export class DashboardService {
       monthlyClaims,
       totalSettlements,
       totalPatients,
-      percentageSettled: percent(monthlyClaims, settledCount),
-      percentageEnhancement: percent(monthlyClaims, enhancementCount),
-      percentagePending: percent(monthlyClaims, pendingCount),
+      totalClaims: monthlyClaims,
+      ...breakdown,
       threeMonths,
       sixMonths,
       nineMonths,
@@ -155,27 +171,7 @@ export class DashboardService {
       })
     ])
 
-    // 4. Status-based % counts
-    const [settledCount, enhancementCount, pendingCount] = await Promise.all([
-      this.prisma.insuranceRequest.count({
-        where: {
-          ...claimWhere,
-          status: ClaimStatus.SETTLED,
-        },
-      }),
-      this.prisma.insuranceRequest.count({
-        where: {
-          ...claimWhere,
-          status: ClaimStatus.ENHANCEMENT,
-        },
-      }),
-      this.prisma.insuranceRequest.count({
-        where: {
-          ...claimWhere,
-          status: ClaimStatus.PENDING,
-        },
-      }),
-    ]);
+    const breakdown = await this.statusBreakdown(claimWhere);
 
     const claimsByTPA = await this.prisma.insuranceRequest.groupBy({
       by: ['tpaName'],
@@ -220,10 +216,8 @@ export class DashboardService {
       activeClaims,
       totalPatients,
       averageSettlementPercentage,
-      percentageSettled: percent(totalClaims, settledCount),
-      percentageEnhancement: percent(totalClaims, enhancementCount),
-      percentagePending: percent(totalClaims, pendingCount),
       totalClaims,
+      ...breakdown,
       claimsByTPA: claimsByTPA.map((t) => ({ name: t.tpaName, count: t._count._all })),
       claimsByInsuranceCompany: claimsByInsurance.map((i) => ({
         name: i.insuranceCompany,
