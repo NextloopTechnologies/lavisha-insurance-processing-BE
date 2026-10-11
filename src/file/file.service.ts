@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ALLOWED_MIME_TYPES, COMPRESSED_IMAGE_EXT, COMPRESSED_IMAGE_MIME, MAX_FILE_SIZE } from 'src/common/constants/file.constants';
+import { ALLOWED_MIME_TYPES, COMPRESSED_IMAGE_EXT, COMPRESSED_IMAGE_MIME, MAX_FILE_SIZE, SPREADSHEET_MIME_BY_EXT } from 'src/common/constants/file.constants';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import { DeleteObjectCommand, DeleteObjectCommandOutput, DeleteObjectsCommand, DeleteObjectsCommandOutput, GetObjectCommand, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -25,7 +25,11 @@ export class FileService {
         folder: string,
         uploader: RequestUser
     ): Promise<S3FileUploadResult> {
-        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        const fileExt = extname(file.originalname);
+        const mimetype = file.mimetype === 'application/octet-stream'
+            ? SPREADSHEET_MIME_BY_EXT[fileExt.toLowerCase()] ?? file.mimetype
+            : file.mimetype;
+        if (!ALLOWED_MIME_TYPES.includes(mimetype)) {
             throw new BadRequestException(`Invalid file type. Only the following types are allowed: ${ALLOWED_MIME_TYPES}`);
         }
 
@@ -33,26 +37,25 @@ export class FileService {
             throw new BadRequestException(`File too large, Max: ${(MAX_FILE_SIZE/1024)/1024} MB` );
         }
 
-        const fileExt = extname(file.originalname);
         const safeName = file.originalname
         .replace(fileExt, '')           // remove extension
         .replace(/[^a-zA-Z0-9_-]/g, '_') // sanitize special chars/spaces
         .substring(0, 50);               // limit length
 
         // images are re-encoded to WebP, so the stored name and Content-Type say WebP
-        const isImage = file.mimetype.startsWith('image/');
+        const isImage = mimetype.startsWith('image/');
         const storedExt = isImage ? COMPRESSED_IMAGE_EXT : fileExt;
-        const contentType = isImage ? COMPRESSED_IMAGE_MIME : file.mimetype;
+        const contentType = isImage ? COMPRESSED_IMAGE_MIME : mimetype;
 
         //  key = folder/originalName_UUID.ext
        const fileName = `${folder}${safeName}_${randomUUID()}${storedExt}`;
         // const fileName = `${folder}${randomUUID()}${fileExt}`;
         let buffer = file.buffer;
 
-        if (file.mimetype === 'application/pdf') {
+        if (mimetype === 'application/pdf') {
             buffer = await compressPdf(buffer);
         } else if (isImage) {
-            buffer = await compressImage(buffer, file.mimetype);
+            buffer = await compressImage(buffer, mimetype);
         }
 
         await s3.send(new PutObjectCommand({

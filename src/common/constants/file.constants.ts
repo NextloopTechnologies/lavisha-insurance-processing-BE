@@ -18,3 +18,10 @@ export const ALLOWED_MIME_TYPES = [
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ];
+
+// Spreadsheets can arrive as application/octet-stream (e.g. Windows without Office);
+// accept those by extension and store them with the proper type.
+export const SPREADSHEET_MIME_BY_EXT: Record<string, string> = {
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+};

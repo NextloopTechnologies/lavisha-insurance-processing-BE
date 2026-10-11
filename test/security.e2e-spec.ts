@@ -460,6 +460,28 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
     const upload = (who: string, folder = 'claims', name = 'scan.png', buffer = PNG) =>
       http().post('/v1/file/upload').set(as(who)).field('folder', folder).attach('file', buffer, { filename: name, contentType: 'image/png' });
 
+    it('accepts Excel sheets, including ones the browser sends as application/octet-stream', async () => {
+      const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const sheet = Buffer.from('PK\u0003\u0004 fake workbook');
+      const contentTypeOf = (key: string) =>
+        s3Calls.filter((c) => c.name === 'PutObjectCommand' && c.input.Key === key).pop()?.input.ContentType;
+
+      const typed = await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+        .attach('file', sheet, { filename: 'Final Bill.xlsx', contentType: XLSX_MIME });
+      expect(typed.status).toBe(201);
+      expect(typed.body.key).toMatch(/^claims\/Final_Bill_[0-9a-f-]{36}\.xlsx$/);
+      expect(contentTypeOf(typed.body.key)).toBe(XLSX_MIME);
+
+      const generic = await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+        .attach('file', sheet, { filename: 'rates.xls', contentType: 'application/octet-stream' });
+      expect(generic.status).toBe(201);
+      expect(contentTypeOf(generic.body.key)).toBe('application/vnd.ms-excel');
+
+      await http().post('/v1/file/upload').set(as('hospa')).field('folder', 'claims')
+        .attach('file', sheet, { filename: 'tool.exe', contentType: 'application/octet-stream' })
+        .expect(400);
+    });
+
     it('tags a hospital upload with that hospital', async () => {
       const res = await upload('hospa');
       expect(res.status).toBe(201);
