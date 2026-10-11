@@ -780,16 +780,16 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
     });
 
     it('chat messages on a claim notify the other side, never the sender', async () => {
-      let since = new Date();
+      // the message texts are unique to this test, so no time window is needed
+      const epoch = new Date(0);
       await http().post('/v1/comments').set(as('hospa')).send({ type: 'NOTE', text: 'Patient shifted to ward 3', insuranceRequestId: claimId }).expect(201);
-      let notified = await notificationsSince(since, new RegExp(`commented on ${ref}: "Patient shifted to ward 3"$`));
+      let notified = await notificationsSince(epoch, new RegExp(`commented on ${ref}: "Patient shifted to ward 3"$`));
       expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.superAdmin].sort());
 
-      since = new Date();
-      await http().post('/v1/comments').set(as('admin')).send({ type: 'NOTE', text: 'Noted', insuranceRequestId: claimId, hospitalId: ids.hospA }).expect(201);
-      notified = await notificationsSince(since, /commented on .*: "Noted"$/);
+      await http().post('/v1/comments').set(as('admin')).send({ type: 'NOTE', text: 'Noted by admin', insuranceRequestId: claimId, hospitalId: ids.hospA }).expect(201);
+      notified = await notificationsSince(epoch, /commented on .*: "Noted by admin"$/);
       expect(notified.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.mgrA].sort());
-      expect(await systemLines()).not.toContain('Noted');
+      expect(await systemLines()).not.toContain('Noted by admin');
     });
 
     it('an enhancement on an unassigned claim no longer fails while notifying', async () => {
