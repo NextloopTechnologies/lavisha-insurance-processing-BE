@@ -710,7 +710,7 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
     const notificationsSince = (since: Date, message: RegExp) =>
       db.notification.findMany({ where: { createdAt: { gte: since } } }).then((ns) => ns.filter((n) => message.test(n.message)));
 
-    it('claim created with pre-auth ticked: two chat lines, creator + super-admin still notified', async () => {
+    it('claim created with pre-auth ticked: two chat lines; super-admin notified, not the creator', async () => {
       const since = new Date();
       const res = await http().post('/v1/claims').set(as('hospa')).send({
         patientId: ids.patientA, doctorName: 'Dr Chat', tpaName: 'TPA', insuranceCompany: 'Insurer', isPreAuth: true,
@@ -723,7 +723,7 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(lines).toContain(`${hosp} marked pre-auth as done for ${ref}`);
       expect(lines.filter((l) => l === `${hosp} created claim ${ref}`)).toHaveLength(1);
       const created = await notificationsSince(since, new RegExp(`created claim ${ref}$`));
-      expect(created.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.superAdmin].sort());
+      expect(created.map((n) => n.userId)).toEqual([ids.superAdmin]);
     });
 
     it('the hospital sees those lines in its chat', async () => {
@@ -732,12 +732,19 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(texts).toEqual(expect.arrayContaining([`${hosp} created claim ${ref}`, `${hosp} marked pre-auth as done for ${ref}`]));
     });
 
-    it('assigning writes one chat line; assignee and hospital are notified as before', async () => {
+    it('assigning writes one chat line; the hospital and its manager are notified, not the acting admin', async () => {
       const since = new Date();
       await http().patch(`/v1/claims/assign/${ref}`).set(as('admin')).send({ assignedTo: ids.admin }).expect(200);
       expect((await systemLines()).filter((l) => l === `admin has assigned ${ref} to admin.`)).toHaveLength(1);
       const notified = await notificationsSince(since, /has assigned/);
-      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA].sort());
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.mgrA].sort());
+    });
+
+    it('a super-admin assigning to someone else also notifies the new assignee', async () => {
+      const since = new Date();
+      await http().patch(`/v1/claims/assign/${ref}`).set(as('superadmin')).send({ assignedTo: ids.admin }).expect(200);
+      const notified = await notificationsSince(since, /has assigned/);
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA, ids.mgrA].sort());
     });
 
     it('pre-auth unticked then ticked on edit: one line each; saving without a change adds none', async () => {
@@ -769,7 +776,33 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(lines).toContain(`admin created query for claim ${ref}`);
       expect(lines).toContain(`${hosp} has marked query as resolved for claim ${ref}`);
       const notified = await notificationsSince(since, /marked query as resolved/);
-      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA].sort());
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.superAdmin].sort());
+    });
+
+    it('chat messages on a claim notify the other side, never the sender', async () => {
+      let since = new Date();
+      await http().post('/v1/comments').set(as('hospa')).send({ type: 'NOTE', text: 'Patient shifted to ward 3', insuranceRequestId: claimId }).expect(201);
+      let notified = await notificationsSince(since, new RegExp(`commented on ${ref}: "Patient shifted to ward 3"$`));
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.superAdmin].sort());
+
+      since = new Date();
+      await http().post('/v1/comments').set(as('admin')).send({ type: 'NOTE', text: 'Noted', insuranceRequestId: claimId, hospitalId: ids.hospA }).expect(201);
+      notified = await notificationsSince(since, /commented on .*: "Noted"$/);
+      expect(notified.map((n) => n.userId).sort()).toEqual([ids.hospA, ids.mgrA].sort());
+      expect(await systemLines()).not.toContain('Noted');
+    });
+
+    it('an enhancement on an unassigned claim no longer fails while notifying', async () => {
+      const claim = await http().post('/v1/claims').set(as('hospa')).send({
+        patientId: ids.patientA, doctorName: 'Dr Unassigned', tpaName: 'TPA', insuranceCompany: 'Insurer',
+        documents: [{ fileName: 'claims/unassigned-icp.pdf', type: DocumentType.ICP }],
+      }).expect(201);
+      const since = new Date();
+      await http().post('/v1/enhancements').set(as('hospa')).send({
+        insuranceRequestId: claim.body.id, numberOfDays: 1, documents: [{ fileName: 'claims/unassigned-enh.pdf', type: DocumentType.OTHER }],
+      }).expect(201);
+      const notified = await notificationsSince(since, new RegExp(`created enhancement for claim ${claim.body.refNumber}$`));
+      expect(notified.map((n) => n.userId)).toEqual([ids.superAdmin]);
     });
   });
 });
