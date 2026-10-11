@@ -2,7 +2,8 @@ export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 // multer/busboy flags a file as over the limit once it reaches fileSize bytes,
 // so the stream limit is one byte above MAX_FILE_SIZE to still accept exactly 10MB
 export const MULTER_FILE_SIZE_LIMIT = MAX_FILE_SIZE + 1;
-export const MAX_BULK_FILES = 6;
+// files per bulk-upload request; the web app batches larger selections
+export const MAX_BULK_FILES = 20;
 
 // compressImage re-encodes every image to WebP; stored keys and Content-Type must match
 export const COMPRESSED_IMAGE_EXT = '.webp';

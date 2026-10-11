@@ -14,6 +14,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient, Role, ClaimStatus, DocumentType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as request from 'supertest';
+import { MAX_BULK_FILES } from 'src/common/constants/file.constants';
 
 // ---- fakes (hoisted above imports by jest) ---------------------------------
 
@@ -529,21 +530,21 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(s3Calls.filter((c) => c.name === 'PutObjectCommand').length).toBe(puts);
     });
 
-    it('rejects more than 6 files in a bulk upload and stores none', async () => {
+    it(`rejects more than ${MAX_BULK_FILES} files in a bulk upload and stores none`, async () => {
       const puts = s3Calls.filter((c) => c.name === 'PutObjectCommand').length;
       let req = http().post('/v1/file/bulkUpload').set(as('hospa')).field('folder', 'claims');
-      for (let i = 0; i < 7; i++) req = req.attach('files', PNG, { filename: `f${i}.png`, contentType: 'image/png' });
+      for (let i = 0; i <= MAX_BULK_FILES; i++) req = req.attach('files', PNG, { filename: `f${i}.png`, contentType: 'image/png' });
       const res = await req;
       expect(res.status).toBe(400);
       expect(s3Calls.filter((c) => c.name === 'PutObjectCommand').length).toBe(puts);
     });
 
-    it('accepts 6 files in a bulk upload and tags each', async () => {
+    it(`accepts ${MAX_BULK_FILES} files in a bulk upload and tags each`, async () => {
       let req = http().post('/v1/file/bulkUpload').set(as('hospb')).field('folder', 'claims');
-      for (let i = 0; i < 6; i++) req = req.attach('files', PNG, { filename: `g${i}.png`, contentType: 'image/png' });
+      for (let i = 0; i < MAX_BULK_FILES; i++) req = req.attach('files', PNG, { filename: `g${i}.png`, contentType: 'image/png' });
       const res = await req;
       expect(res.status).toBe(201);
-      expect(res.body).toHaveLength(6);
+      expect(res.body).toHaveLength(MAX_BULK_FILES);
       ids.keyHospB = res.body[0].key;
       for (const item of res.body) expect(s3Store.get(item.key)?.metadata).toEqual({ 'owner-scope': ids.hospB });
     });
