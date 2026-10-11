@@ -14,6 +14,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { EnhancementsModule } from './enhancements/enhancements.module';
 import { QueriesModule } from './queries/queries.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { LeadsModule } from './leads/leads.module';
 import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from './auth/roles/roles.guard';
 import { PermissionsGuard } from './auth/permissions/permissions.guard';
@@ -33,7 +34,8 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
     DocumentsModule,
     EnhancementsModule,
     QueriesModule,
-    NotificationsModule
+    NotificationsModule,
+    LeadsModule
   ],
   controllers: [AppController],
   providers: [
