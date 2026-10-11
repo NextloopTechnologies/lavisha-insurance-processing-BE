@@ -8,6 +8,7 @@ import { DocumentResponseDto, MutateResponseInsuranceRequestDto } from './dto/mu
 import { FileService } from 'src/file/file.service';
 import { CommonService } from 'src/common/common.service';
 import { AddAssigneeInsuranceRequestDto } from './dto/assign-insurance-requests.dto';
+import { CLAIM_STATUS_LABELS } from 'src/common/constants/claim-status.constants';
 
 @Injectable()
 export class InsuranceRequestsService {
@@ -401,7 +402,7 @@ export class InsuranceRequestsService {
     }
 
     if (data.status && claimExists.status !== data.status) {
-      const message = `${userName} updated status from ${claimExists.status} to ${data.status} for ${updatedClaim.refNumber}`
+      const message = `${userName} updated status from ${CLAIM_STATUS_LABELS[claimExists.status]} to ${CLAIM_STATUS_LABELS[data.status]} for ${updatedClaim.refNumber}`
       await this.commonService.notifyClaimEvent({
         ...notifyAndHistoryPayload,
         message

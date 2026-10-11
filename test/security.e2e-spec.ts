@@ -747,6 +747,17 @@ describeIfDb('Security: access control and file ownership (e2e)', () => {
       expect(notified.map((n) => n.userId).sort()).toEqual([ids.admin, ids.hospA, ids.mgrA].sort());
     });
 
+    it('status changes accept the new flow statuses and use display names in the chat line', async () => {
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'SENT_TO_TPA' }).expect(200);
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'QUERY_REPLY_SENT' }).expect(200);
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'DISCHARGE_INITIATED' }).expect(200);
+      const lines = await systemLines();
+      expect(lines).toContain(`admin updated status from Pre-Auth Pending to Pre-Auth Sent to TPA for ${ref}`);
+      expect(lines).toContain(`admin updated status from Pre-Auth Sent to TPA to Query Reply Sent for ${ref}`);
+      expect(lines).toContain(`admin updated status from Query Reply Sent to Discharge Initiated for ${ref}`);
+      await http().patch(`/v1/claims/${ref}`).set(as('admin')).send({ status: 'NOT_A_STATUS' }).expect(400);
+    });
+
     it('pre-auth unticked then ticked on edit: one line each; saving without a change adds none', async () => {
       await http().patch(`/v1/claims/${ref}`).set(as('hospa')).send({ isPreAuth: false }).expect(200);
       await http().patch(`/v1/claims/${ref}`).set(as('hospa')).send({ isPreAuth: false, diagnosis: 'no pre-auth change' }).expect(200);
