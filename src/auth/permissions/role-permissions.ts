@@ -43,6 +43,9 @@ export const RolePermissions: Record<Role, Permission[]> = {
     // notifications
     Permission.NOTIFICATION_READ_LIST,
     Permission.NOTIFICATION_MARK_READ,
+    // leads
+    Permission.LEAD_LIST,
+    Permission.LEAD_UPDATE,
   ],
   ADMIN: [
     Permission.USER_CREATE,
@@ -77,6 +80,9 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.QUERY_UPDATE,
     Permission.NOTIFICATION_READ_LIST,
     Permission.NOTIFICATION_MARK_READ,
+    // leads
+    Permission.LEAD_LIST,
+    Permission.LEAD_UPDATE,
   ],
   HOSPITAL: [
     Permission.USER_READ,

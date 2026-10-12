@@ -215,3 +215,28 @@ model ActivityLog {
   timestamp   DateTime @default(now())
 }
 
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  CLOSED
+}
+
+// Demo / contact enquiries submitted from the marketing website.
+model Lead {
+  id        String     @id @default(uuid())
+  name      String
+  hospital  String
+  phone     String
+  email     String?
+  city      String?
+  volume    String?
+  message   String?
+  source    String     @default("website")
+  status    LeadStatus @default(NEW)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([status, createdAt])
+}
