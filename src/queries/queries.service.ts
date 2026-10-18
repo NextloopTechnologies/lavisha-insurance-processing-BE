@@ -56,7 +56,6 @@ export class QueriesService {
 
     if(!createdQuery) throw new BadRequestException("Failed to create query!")
     const patientHospitalId = createdQuery.insuranceRequest.patient.hospital.id
-    const notifiedTo = createdQuery.insuranceRequest.assignedTo
     const refNumber = createdQuery.insuranceRequest.refNumber
 
     // notify to assignee and hospital user
@@ -66,18 +65,10 @@ export class QueriesService {
         message: `${userName} created ${enhancementId ? 'enhancement query' : 'query'} for claim ${refNumber}`
     }
 
-    // chat history line + hospital notification, then the assignee's notification
-    await Promise.all([
-        await this.commonService.logInsuranceRequestChange({
-            ...notificationPayload,
-            notifiedTo: patientHospitalId,
-            hospitalId: patientHospitalId
-        }),
-        await this.commonService.logInsuranceRequestNotification({
-            ...notificationPayload,
-            notifiedTo,
-        })
-    ])
+    // chat history line; the other side of the claim is notified
+    await this.commonService.notifyClaimEvent({
+      ...notificationPayload
+    })
 
     const createdDocuments = await this.prisma.document.createManyAndReturn({
       data: documents.map((document) => ({
@@ -99,17 +90,9 @@ export class QueriesService {
       message: `${userName} uploaded ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`,
     }
 
-    await Promise.all([
-      await this.commonService.logInsuranceRequestChange({
-        ...notifyAndHistoryPayload,
-        notifiedTo,
-        hospitalId: patientHospitalId,
-      }),
-      await this.commonService.logInsuranceRequestNotification({
-        ...notifyAndHistoryPayload,
-        notifiedTo: patientHospitalId
-      })
-    ])
+    await this.commonService.notifyClaimEvent({
+      ...notifyAndHistoryPayload
+    })
 
     return {
       id: createdQuery.id,
@@ -164,7 +147,6 @@ export class QueriesService {
 
     if(!updatedQuery) throw new BadRequestException("Failed to update query!")
     const patientHospitalId = updatedQuery.insuranceRequest.patient.hospital.id
-    const notifiedTo = updatedQuery.insuranceRequest.assignedTo
     const refNumber = updatedQuery.insuranceRequest.refNumber
 
     await this.commonService.logActivity(
@@ -182,20 +164,11 @@ export class QueriesService {
 
     if(data.isResolved){
       const message = `${userName} has marked ${updatedQuery.enhancementId ? 'enhancement query' : 'query'} as resolved for claim ${refNumber}`
-      // chat history line + hospital notification, then the assignee's notification
-      await Promise.all([
-          await this.commonService.logInsuranceRequestChange({
-              ...notifyAndHistoryPayload,
-              notifiedTo: patientHospitalId,
-              hospitalId: patientHospitalId,
-              message
-          }),
-          await this.commonService.logInsuranceRequestNotification({
-              ...notifyAndHistoryPayload,
-              notifiedTo,
-              message
-          })
-      ])
+      // chat history line; the other side of the claim is notified
+      await this.commonService.notifyClaimEvent({
+        ...notifyAndHistoryPayload,
+        message
+      })
     }
 
     if(documents?.length){
@@ -216,19 +189,10 @@ export class QueriesService {
         })
         if(!createdDocuments.length) throw new BadRequestException("Failed to create documents!")
         const message = `${userName} added ${createdDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`
-        await Promise.all([
-          await this.commonService.logInsuranceRequestChange({
-            ...notifyAndHistoryPayload,
-            notifiedTo,
-            hospitalId: patientHospitalId,
-            message
-          }),
-          await this.commonService.logInsuranceRequestNotification({
-            ...notifyAndHistoryPayload,
-            notifiedTo: patientHospitalId,
-            message
-          })
-        ])
+        await this.commonService.notifyClaimEvent({
+          ...notifyAndHistoryPayload,
+          message
+        })
       }
 
       if(existingDocs?.length){
@@ -254,19 +218,10 @@ export class QueriesService {
         if(!updatedDocuments.length) throw new BadRequestException("Failed to update documents!")
 
         const message = `${userName} modified ${updatedDocuments.length} document(s) for ${refNumber}'s ${enhancementId ? 'enhancement query' : 'query'}.`
-        await Promise.all([
-          await this.commonService.logInsuranceRequestChange({
-            ...notifyAndHistoryPayload,
-            notifiedTo,
-            hospitalId: patientHospitalId,
-            message
-          }),
-          await this.commonService.logInsuranceRequestNotification({
-            ...notifyAndHistoryPayload,
-            notifiedTo: patientHospitalId,
-            message
-          })
-        ])
+        await this.commonService.notifyClaimEvent({
+          ...notifyAndHistoryPayload,
+          message
+        })
       }
     }
 
