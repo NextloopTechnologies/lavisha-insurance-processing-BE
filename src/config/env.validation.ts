@@ -53,4 +53,9 @@ export class EnvSchema {
     @IsOptional()
     @IsString()
     AWS_BUCKET_NAME?: string;
+
+    // Shared secret the marketing website sends as x-leads-key. Unset = lead intake disabled.
+    @IsOptional()
+    @IsString()
+    LEADS_API_KEY?: string;
 }
